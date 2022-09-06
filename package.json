@@ -1,0 +1,24 @@
+{
+    "name": "com.brunomikoski.servicelocator",
+    "displayName": "Service Locator",
+    "version": "1.0.0",
+    "unity": "2020.3",
+    "description": "",
+    "keywords": [
+      "Services",
+      "Dependency Injection"
+    ],
+    "category": "editor extensions",
+    "homepage": "https://github.com/brunomikoski/ServiceLocator",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/brunomikoski/ServiceLocator.git"
+    },
+    "bugs": "https://github.com/brunomikoski/ServiceLocator/issues",
+    "author": {
+      "name": "Bruno Mikoski",
+      "url": "https://www.brunomikoski.com"
+    },
+    "type": "library"
+  }
+  

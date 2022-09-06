@@ -1,0 +1,18 @@
+{
+    "name": "BrunoMikoski.ServiceLocator.Editor",
+    "rootNamespace": "",
+    "references": [
+        "BrunoMikoski.ServiceLocator"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
