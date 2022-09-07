@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using Object = UnityEngine.Object;
 #if UNITASK_ENABLED
@@ -262,7 +263,41 @@ namespace BrunoMikoski.ServicesLocation
         public void ResolveDependencies(IDependsOnServices serviceDependent)
         {
             waitingOnDependenciesTobeResolved.Add(serviceDependent);
+            
+            
             TryResolveDependencies();
+        }
+
+        public void ResolveDependencies(object targetObject)
+        {
+            List<Type> dependencies = new List<Type>();
+            MemberInfo[] memberInfos = targetObject.GetType().GetMembers(BindingFlags.Instance | BindingFlags.Public |
+                                                                         BindingFlags.Static | BindingFlags.NonPublic);
+            Type serviceReferenceType = typeof(ServiceReference<>);
+            
+            for (int i = 0; i < memberInfos.Length; i++)
+            {
+                MemberInfo info = memberInfos[i];
+                if (info.MemberType != MemberTypes.Field)
+                    continue;
+
+                FieldInfo fieldInfo = ((FieldInfo) info);
+
+                if (!fieldInfo.FieldType.IsGenericType)
+                    continue;
+                
+                if (fieldInfo.FieldType.GetGenericTypeDefinition() == serviceReferenceType)
+                {
+                    Type type = fieldInfo.FieldType.GetGenericArguments()[0];
+                    if(dependencies.Contains(type))
+                        continue;
+
+                    dependencies.Add(type);
+                }
+            }
+
+            if (dependencies.Count > 0)
+                Debug.Log($"{targetObject} depends on {string.Join(',', dependencies)} ");
         }
     }
 }
