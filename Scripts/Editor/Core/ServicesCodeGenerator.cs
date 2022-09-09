@@ -10,7 +10,6 @@ namespace BrunoMikoski.ServicesLocation
 {
     public static class ServicesCodeGenerator
     {
-        private const string DEFAULT_CODE_GENERATION_FOLDER_PATH = "Assets/Generated/Scripts";
         private const string AUTO_GENERATION_MENU_ITEM_NAME =
             "Tools/ServiceLocator/Auto Generate Services File On Code Compilation";
 
@@ -53,12 +52,6 @@ namespace BrunoMikoski.ServicesLocation
             string referencesClassName = serviceLocatorSettings.ReferenceClassName;
             string targetScriptFolder = serviceLocatorSettings.GeneratedScriptsFolderPath;
 
-            if (string.IsNullOrEmpty(targetScriptFolder))
-            {
-                targetScriptFolder = DEFAULT_CODE_GENERATION_FOLDER_PATH;
-                serviceLocatorSettings.OverrideCodeGenerationFolderPath(targetScriptFolder);
-            }
-            
 
             if (!Directory.Exists(targetScriptFolder))
                 Directory.CreateDirectory(targetScriptFolder);

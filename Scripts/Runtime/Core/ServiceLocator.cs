@@ -33,6 +33,19 @@ namespace BrunoMikoski.ServicesLocation
         private Dictionary<IDependsOnServices, Type> waitingDependenciesBeResolvedToRegister =
             new Dictionary<IDependsOnServices, Type>();
 
+        private static DependencyCache dependencies = new DependencyCache();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        private static void LoadAOTDependencies()
+        {
+            TextAsset aotFile = Resources.Load<TextAsset>("ServiceLocatorAOTDependencies");
+            if (aotFile == null)
+                return;
+
+            JsonUtility.FromJsonOverwrite(aotFile.text, dependencies);
+            dependencies.Parse();
+        }
+        
         public void RegisterInstance<T>(T instance)
         {
             Type type = typeof(T);

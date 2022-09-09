@@ -5,17 +5,39 @@ namespace BrunoMikoski.ServicesLocation
 {
     public class ServiceLocatorSettings : ScriptableObjectForPreferences<ServiceLocatorSettings>
     {
+        private const string DEFAULT_CODE_GENERATION_FOLDER_PATH = "Assets/Generated/Scripts";
+
         [SerializeField]
         private string generatedScriptsFolderPath;
-        public string GeneratedScriptsFolderPath => generatedScriptsFolderPath;
+        public string GeneratedScriptsFolderPath
+        {
+            get
+            {
+                if(string.IsNullOrEmpty(generatedScriptsFolderPath))
+                    return DEFAULT_CODE_GENERATION_FOLDER_PATH;
+                return generatedScriptsFolderPath;
+            }
+        }
 
         [SerializeField]
         private string servicesFileName = "Services";
         public string ServicesFileName => servicesFileName;
-
+        
+        
         [SerializeField]
         private string referenceClassName = "Ref";
         public string ReferenceClassName => referenceClassName;
+
+
+        [SerializeField]
+        private DependencySearchPattern[] searchPatterns = new DependencySearchPattern[]
+        {
+            new DependencySearchPattern("Services.", new[] { '.', ';', ' ', '(' }),
+            new DependencySearchPattern("ServiceLocator.Instance.GetInstance<", new[] { '>' })
+        };
+
+        public DependencySearchPattern[] SearchPatterns => searchPatterns;
+
 
         [SettingsProvider]
         private static SettingsProvider SettingsProvider()
@@ -44,6 +66,7 @@ namespace BrunoMikoski.ServicesLocation
             SerializedProperty servicesFileNameSerializedProperty = serializedObject.FindProperty(nameof(servicesFileName));
             EditorGUILayout.PropertyField(servicesFileNameSerializedProperty);
             EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(referenceClassName)));
+            EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(searchPatterns)));
             
             if (defaultAsset == null)
             {
