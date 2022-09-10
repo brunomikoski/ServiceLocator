@@ -34,7 +34,7 @@ namespace BrunoMikoski.ServicesLocation
     }
     
 
-    public interface IDependsOnServices
+    public interface IDependsOnExplicitServices
     {
         Type[] DependsOnServices { get; }
         void OnServicesDependenciesResolved();

@@ -28,10 +28,10 @@ namespace BrunoMikoski.ServicesLocation
         private static Dictionary<Type, List<IServiceObservable>> typeToObservables =
             new Dictionary<Type, List<IServiceObservable>>();
 
-        private List<IDependsOnServices> waitingOnDependenciesTobeResolved = new List<IDependsOnServices>();
+        private List<IDependsOnExplicitServices> waitingOnDependenciesTobeResolved = new List<IDependsOnExplicitServices>();
 
-        private Dictionary<IDependsOnServices, Type> waitingDependenciesBeResolvedToRegister =
-            new Dictionary<IDependsOnServices, Type>();
+        private Dictionary<IDependsOnExplicitServices, Type> waitingDependenciesBeResolvedToRegister =
+            new Dictionary<IDependsOnExplicitServices, Type>();
 
         private static DependencyCache dependencies = new DependencyCache();
 
@@ -57,7 +57,7 @@ namespace BrunoMikoski.ServicesLocation
             if (!CanRegisterService(type, instance))
                 return;
 
-            if (instance is IDependsOnServices serviceDependent)
+            if (instance is IDependsOnExplicitServices serviceDependent)
             {
                 if (!IsDependenciesResolved(serviceDependent))
                 {
@@ -81,7 +81,7 @@ namespace BrunoMikoski.ServicesLocation
                 onRegistered.OnRegisteredOnServiceLocator(this);
             }
 
-            if (instance is IDependsOnServices serviceDependent)
+            if (instance is IDependsOnExplicitServices serviceDependent)
             {
                 serviceDependent.OnServicesDependenciesResolved();
             }
@@ -130,7 +130,7 @@ namespace BrunoMikoski.ServicesLocation
             {
                 Debug.LogError(
                     $"The Service {typeof(T)} is not yet registered on the ServiceLocator, " +
-                    $"consider implementing IDependsOnServices interface");
+                    $"consider implementing IDependsOnExplicitServices interface");
             }
             else
             {
@@ -238,7 +238,7 @@ namespace BrunoMikoski.ServicesLocation
         {
             for (int i = waitingOnDependenciesTobeResolved.Count - 1; i >= 0; i--)
             {
-                IDependsOnServices dependsOnServices = waitingOnDependenciesTobeResolved[i];
+                IDependsOnExplicitServices dependsOnServices = waitingOnDependenciesTobeResolved[i];
                 if (!IsDependenciesResolved(dependsOnServices)) 
                     continue;
                 
@@ -254,7 +254,7 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        private bool IsDependenciesResolved(IDependsOnServices dependsOnServices)
+        private bool IsDependenciesResolved(IDependsOnExplicitServices dependsOnServices)
         {
             for (int i = 0; i < dependsOnServices.DependsOnServices.Length; i++)
             {
@@ -273,7 +273,7 @@ namespace BrunoMikoski.ServicesLocation
         }
 #endif
 
-        public void ResolveDependencies(IDependsOnServices serviceDependent)
+        public void ResolveDependencies(IDependsOnExplicitServices serviceDependent)
         {
             waitingOnDependenciesTobeResolved.Add(serviceDependent);
             

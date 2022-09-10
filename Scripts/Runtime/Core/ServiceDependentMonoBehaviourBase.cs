@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace BrunoMikoski.ServicesLocation
 {
-    public abstract class ServiceDependentMonoBehaviourBase : MonoBehaviour, IDependsOnServices
+    public abstract class ServiceDependentMonoBehaviourBase : MonoBehaviour, IDependsOnExplicitServices
     {
         public abstract Type[] DependsOnServices { get; }
         public abstract void OnServicesDependenciesResolved();
