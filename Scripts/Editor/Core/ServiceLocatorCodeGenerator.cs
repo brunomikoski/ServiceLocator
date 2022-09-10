@@ -13,35 +13,13 @@ namespace BrunoMikoski.ServicesLocation
 {
     public static class ServiceLocatorCodeGenerator
     {
-        private const string AUTO_GENERATION_MENU_ITEM_NAME =
-            "Tools/ServiceLocator/Auto Generate Services File On Code Compilation";
-
-        private const string GENERATE_AOT_DEPENDENCIES =
-            "Tools/ServiceLocator/Generate AOT Dependencies";
-
-        private static bool AutoGenerateWhenScriptsReload
-        {
-            get => EditorPrefs.GetBool(nameof(AutoGenerateWhenScriptsReload), false);
-            set => EditorPrefs.SetBool(nameof(AutoGenerateWhenScriptsReload), value);
-        }
+        private const string GENERATE_AOT_DEPENDENCIES = "Tools/ServiceLocator/Generate AOT Dependencies";
+        private const string GENERATE_STATIC_FILE = "Tools/ServiceLocator/Generate Services File";
 
         private static Dictionary<string, List<ServiceImplementationAttribute>> categoryToAttributesList =
             new Dictionary<string, List<ServiceImplementationAttribute>>();
 
         private static Dictionary<string, Type> nameToTypeCache = new Dictionary<string, Type>();
-
-        [MenuItem(AUTO_GENERATION_MENU_ITEM_NAME)]
-        private static void AutoGenerateToggle()
-        {
-            AutoGenerateWhenScriptsReload = !AutoGenerateWhenScriptsReload;
-        }
-
-        [MenuItem(AUTO_GENERATION_MENU_ITEM_NAME, true)]
-        private static bool AutoGenerateToggleValidation()
-        {
-            Menu.SetChecked(AUTO_GENERATION_MENU_ITEM_NAME, AutoGenerateWhenScriptsReload);
-            return true;
-        }
 
         [MenuItem(GENERATE_AOT_DEPENDENCIES)]
         public static void GenerateAOTDependencisFile()
@@ -56,54 +34,60 @@ namespace BrunoMikoski.ServicesLocation
                 if (typeof(IDependsOnExplicitServices).IsAssignableFrom(type))
                     continue;
                 
-                MemberInfo[] memberInfos = type.GetMembers(BindingFlags.Instance | BindingFlags.Public |
-                                                           BindingFlags.Static | BindingFlags.NonPublic);
 
                 HashSet<Type> dependencies = new HashSet<Type>();
 
-                for (int j = 0; j < memberInfos.Length; j++)
+                if (ServiceLocatorSettings.GetInstance().SearchForDependencyOnFields)
                 {
-                    MemberInfo info = memberInfos[j];
-                    if (info.MemberType != MemberTypes.Field)
-                        continue;
-
-                    FieldInfo fieldInfo = ((FieldInfo) info);
-
-                    if (!fieldInfo.FieldType.IsGenericType)
-                        continue;
-
-                    if (fieldInfo.FieldType.GetGenericTypeDefinition() == typeof(ServiceReference<>))
+                    MemberInfo[] memberInfos = type.GetMembers(BindingFlags.Instance | BindingFlags.Public |
+                                                               BindingFlags.Static | BindingFlags.NonPublic);
+                    for (int j = 0; j < memberInfos.Length; j++)
                     {
-                        Type fieldType = fieldInfo.FieldType.GetGenericArguments()[0];
+                        MemberInfo info = memberInfos[j];
+                        if (info.MemberType != MemberTypes.Field)
+                            continue;
 
-                        dependencies.Add(fieldType);
+                        FieldInfo fieldInfo = ((FieldInfo) info);
+
+                        if (!fieldInfo.FieldType.IsGenericType)
+                            continue;
+
+                        if (fieldInfo.FieldType.GetGenericTypeDefinition() == typeof(ServiceReference<>))
+                        {
+                            Type fieldType = fieldInfo.FieldType.GetGenericArguments()[0];
+
+                            dependencies.Add(fieldType);
+                        }
                     }
                 }
 
 
-                MethodInfo[] methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Public |
-                                                       BindingFlags.Static | BindingFlags.NonPublic);
-
-                for (int j = 0; j < methods.Length; j++)
+                if (ServiceLocatorSettings.GetInstance().SearchForDependenciesOnMethods)
                 {
-                    MethodInfo methodInfo = methods[j];
-                    MethodBody methodBody = methodInfo.GetMethodBody();
+                    MethodInfo[] methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Public |
+                                                           BindingFlags.Static | BindingFlags.NonPublic);
 
-                    if (methodBody == null)
-                        continue;
-
-                    for (int k = 0; k < methodBody.LocalVariables.Count; k++)
+                    for (int j = 0; j < methods.Length; j++)
                     {
-                        LocalVariableInfo localVariableInfo = methodBody.LocalVariables[k];
-                        if (localVariableInfo == null || localVariableInfo.LocalType == null ||
-                            !localVariableInfo.LocalType.IsGenericType)
+                        MethodInfo methodInfo = methods[j];
+                        MethodBody methodBody = methodInfo.GetMethodBody();
+
+                        if (methodBody == null)
                             continue;
 
-                        if (localVariableInfo.LocalType.GetGenericTypeDefinition() == typeof(ServiceReference<>))
+                        for (int k = 0; k < methodBody.LocalVariables.Count; k++)
                         {
-                            Type fieldType = localVariableInfo.LocalType.GetGenericArguments()[0];
+                            LocalVariableInfo localVariableInfo = methodBody.LocalVariables[k];
+                            if (localVariableInfo == null || localVariableInfo.LocalType == null ||
+                                !localVariableInfo.LocalType.IsGenericType)
+                                continue;
 
-                            dependencies.Add(fieldType);
+                            if (localVariableInfo.LocalType.GetGenericTypeDefinition() == typeof(ServiceReference<>))
+                            {
+                                Type fieldType = localVariableInfo.LocalType.GetGenericArguments()[0];
+
+                                dependencies.Add(fieldType);
+                            }
                         }
                     }
                 }
@@ -165,19 +149,25 @@ namespace BrunoMikoski.ServicesLocation
         /// Only try to generate the new Services file if there's a file available with some content on it, to avoid
         /// refreshing database code generation issues.
         /// </summary>
-        [DidReloadScripts]
+        [DidReloadScripts(1000)]
         private static void DidScripsReload()
         {
             if (Application.isPlaying || !Application.isEditor || Application.isBatchMode)
                 return;
 
-            if (!AutoGenerateWhenScriptsReload)
-                return;
+            if (ServiceLocatorSettings.GetInstance().GenerateStaticFileOnScriptReload)
+            {
+                GenerateServicesClass();
+            }
 
-            GenerateServicesClass();
+            if (ServiceLocatorSettings.GetInstance().GenerateAOTDependencyFile &&
+                ServiceLocatorSettings.GetInstance().GenerateAOTDependencyFileOnScriptReload)
+            {
+                GenerateAOTDependencisFile();
+            }
         }
 
-        [MenuItem("Tools/ServiceLocator/Generate Services File")]
+        [MenuItem(GENERATE_STATIC_FILE)]
         internal static bool GenerateServicesClass()
         {
             categoryToAttributesList.Clear();

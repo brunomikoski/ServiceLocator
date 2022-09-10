@@ -25,11 +25,30 @@ namespace BrunoMikoski.ServicesLocation
         private string servicesFileName = "Services";
         public string ServicesFileName => servicesFileName;
         
-        
         [SerializeField]
         private string referenceClassName = "Ref";
         public string ReferenceClassName => referenceClassName;
 
+        [SerializeField] 
+        private bool generateStaticFileOnScriptReload = false;
+        public bool GenerateStaticFileOnScriptReload => generateStaticFileOnScriptReload;
+
+        [SerializeField] 
+        private bool generateAOTDependencyFile = true;
+        public bool GenerateAOTDependencyFile => generateAOTDependencyFile;
+
+        [SerializeField]
+        private bool generateAOTDependencyFileOnScriptReload = true;
+        public bool GenerateAOTDependencyFileOnScriptReload => generateAOTDependencyFileOnScriptReload;
+
+        [SerializeField]
+        private bool searchForDependencyOnFields = true;
+        public bool SearchForDependencyOnFields => searchForDependencyOnFields;
+
+        [SerializeField] 
+        private bool searchForDependenciesOnMethods = true;
+        public bool SearchForDependenciesOnMethods => searchForDependenciesOnMethods;
+        
         [SerializeField] 
         private bool useDeepDependencySearch;
         public bool UseDeepDependencySearch => useDeepDependencySearch;
@@ -41,7 +60,7 @@ namespace BrunoMikoski.ServicesLocation
             @"ServiceLocator[\s]*\.[\s]*Instance[\s]*\.[\s]*GetInstance<([\w+]+)"
         };
         public string[] DeepDependencySearchRegex => deepDependencySearchRegex;
-
+        
         
         private static readonly GUIContent deepSearchGUIContent = new GUIContent(
             "Deep Search",
@@ -65,6 +84,10 @@ namespace BrunoMikoski.ServicesLocation
 
             using (EditorGUI.ChangeCheckScope changeCheck = new EditorGUI.ChangeCheckScope())
             {
+                EditorGUILayout.BeginVertical("Box");
+                EditorGUILayout.LabelField("Static Access File", EditorStyles.boldLabel);
+                EditorGUILayout.Space();
+
                 DefaultAsset newFolder = EditorGUILayout.ObjectField("Default Scripts Folder", defaultAsset, typeof(DefaultAsset), false) as DefaultAsset;
                 if (changeCheck.changed)
                 {
@@ -74,19 +97,38 @@ namespace BrunoMikoski.ServicesLocation
                 
                 EditorGUILayout.PropertyField(servicesFileNameSerializedProperty);
                 EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(referenceClassName)));
-                SerializedProperty deepSearchSP = serializedObject.FindProperty(nameof(useDeepDependencySearch));
-                EditorGUILayout.PropertyField(deepSearchSP, deepSearchGUIContent);
+
+
+                EditorGUILayout.EndVertical();
+
+                EditorGUILayout.BeginVertical("Box");
+                EditorGUILayout.LabelField("AOT Dependencies File", EditorStyles.boldLabel);
+                EditorGUILayout.Space();
                 
-                if (deepSearchSP.boolValue)
+                SerializedProperty generateAOTDependencyFileSP = serializedObject.FindProperty(nameof(generateAOTDependencyFile));
+                EditorGUILayout.PropertyField(generateAOTDependencyFileSP);
+
+                if (generateAOTDependencyFileSP.boolValue)
                 {
-                    EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(deepDependencySearchRegex)),deepSearchGUIContent);
-    
-                    if (!string.Equals(servicesFileNameSerializedProperty.stringValue, DEFAULT_SERVICES_NAME, StringComparison.Ordinal))
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(searchForDependencyOnFields)));
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(searchForDependenciesOnMethods)));
+                    
+                    SerializedProperty deepSearchSP = serializedObject.FindProperty(nameof(useDeepDependencySearch));
+                    EditorGUILayout.PropertyField(deepSearchSP, deepSearchGUIContent);
+                
+                    if (deepSearchSP.boolValue)
                     {
-                        EditorGUILayout.HelpBox($"You might need to update the Deep Dependency Regex to match your new services filename",
-                            MessageType.Warning);
+                        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(deepDependencySearchRegex)),deepSearchGUIContent);
+    
+                        if (!string.Equals(servicesFileNameSerializedProperty.stringValue, DEFAULT_SERVICES_NAME, StringComparison.Ordinal))
+                        {
+                            EditorGUILayout.HelpBox($"You might need to update the Deep Dependency Regex to match your new services filename",
+                                MessageType.Warning);
+                        }
                     }
                 }
+                
+                EditorGUILayout.EndVertical();
 
                 if (changeCheck.changed)
                     serializedObject.ApplyModifiedProperties();
