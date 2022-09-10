@@ -28,12 +28,12 @@ namespace BrunoMikoski.ServicesLocation
         private static Dictionary<Type, List<IServiceObservable>> typeToObservables =
             new Dictionary<Type, List<IServiceObservable>>();
 
-        private List<IDependsOnExplicitServices> waitingOnDependenciesTobeResolved = new List<IDependsOnExplicitServices>();
+        private List<IDependsOnService> waitingOnDependenciesTobeResolved = new List<IDependsOnService>();
 
-        private Dictionary<IDependsOnExplicitServices, Type> waitingDependenciesBeResolvedToRegister =
-            new Dictionary<IDependsOnExplicitServices, Type>();
+        private Dictionary<IDependsOnService, Type> waitingDependenciesBeResolvedToRegister =
+            new Dictionary<IDependsOnService, Type>();
 
-        private static DependencyCache dependencies = new DependencyCache();
+        private static DependencyCache dependencyCache = new DependencyCache();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void LoadAOTDependencies()
@@ -42,8 +42,8 @@ namespace BrunoMikoski.ServicesLocation
             if (aotFile == null)
                 return;
 
-            JsonUtility.FromJsonOverwrite(aotFile.text, dependencies);
-            dependencies.Parse();
+            JsonUtility.FromJsonOverwrite(aotFile.text, dependencyCache);
+            dependencyCache.Parse();
         }
         
         public void RegisterInstance<T>(T instance)
@@ -57,7 +57,7 @@ namespace BrunoMikoski.ServicesLocation
             if (!CanRegisterService(type, instance))
                 return;
 
-            if (instance is IDependsOnExplicitServices serviceDependent)
+            if (instance is IDependsOnService serviceDependent)
             {
                 if (!IsDependenciesResolved(serviceDependent))
                 {
@@ -161,7 +161,7 @@ namespace BrunoMikoski.ServicesLocation
         public void UnregisterAllServices()
         {
             List<object> activeInstances = new List<object>(typeToInstances.Count);
-            foreach (var typeToInstance in typeToInstances)
+            foreach (KeyValuePair<Type, object> typeToInstance in typeToInstances)
                 activeInstances.Add(typeToInstance.Value);
 
             for (int i = activeInstances.Count - 1; i >= 0; i--)
@@ -238,7 +238,7 @@ namespace BrunoMikoski.ServicesLocation
         {
             for (int i = waitingOnDependenciesTobeResolved.Count - 1; i >= 0; i--)
             {
-                IDependsOnExplicitServices dependsOnServices = waitingOnDependenciesTobeResolved[i];
+                IDependsOnService dependsOnServices = waitingOnDependenciesTobeResolved[i];
                 if (!IsDependenciesResolved(dependsOnServices)) 
                     continue;
                 
@@ -254,12 +254,22 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        private bool IsDependenciesResolved(IDependsOnExplicitServices dependsOnServices)
+        private bool IsDependenciesResolved(IDependsOnService dependsOnServices)
         {
-            for (int i = 0; i < dependsOnServices.DependsOnServices.Length; i++)
+            if (dependsOnServices is IDependsOnExplicitServices explicitServices)
             {
-                Type dependentType = dependsOnServices.DependsOnServices[i];
-                if (!HasService(dependentType))
+                for (int i = 0; i < explicitServices.DependsOnServices.Length; i++)
+                {
+                    if (!HasService(explicitServices.DependsOnServices[i]))
+                        return false;
+                }
+                return true;
+            }
+
+            Type[] dependencies = dependencyCache.GetDependencies(dependsOnServices.GetType());
+            for (int i = 0; i < dependencies.Length; i++)
+            {
+                if (!HasService(dependencies[i]))
                     return false;
             }
 
@@ -277,40 +287,20 @@ namespace BrunoMikoski.ServicesLocation
         {
             waitingOnDependenciesTobeResolved.Add(serviceDependent);
             
-            
             TryResolveDependencies();
         }
 
-        public void ResolveDependencies(object targetObject)
+        public void ResolveDependencies(IDependsOnService dependsOnService)
         {
-            List<Type> dependencies = new List<Type>();
-            MemberInfo[] memberInfos = targetObject.GetType().GetMembers(BindingFlags.Instance | BindingFlags.Public |
-                                                                         BindingFlags.Static | BindingFlags.NonPublic);
-            Type serviceReferenceType = typeof(ServiceReference<>);
-            
-            for (int i = 0; i < memberInfos.Length; i++)
+            Type[] dependencies = dependencyCache.GetDependencies(dependsOnService.GetType());
+            if (dependencies == null)
             {
-                MemberInfo info = memberInfos[i];
-                if (info.MemberType != MemberTypes.Field)
-                    continue;
-
-                FieldInfo fieldInfo = ((FieldInfo) info);
-
-                if (!fieldInfo.FieldType.IsGenericType)
-                    continue;
-                
-                if (fieldInfo.FieldType.GetGenericTypeDefinition() == serviceReferenceType)
-                {
-                    Type type = fieldInfo.FieldType.GetGenericArguments()[0];
-                    if(dependencies.Contains(type))
-                        continue;
-
-                    dependencies.Add(type);
-                }
+                dependsOnService.OnServicesDependenciesResolved();
+                return;
             }
-
-            if (dependencies.Count > 0)
-                Debug.Log($"{targetObject} depends on {string.Join(',', dependencies)} ");
+            
+            waitingOnDependenciesTobeResolved.Add(dependsOnService);
+            TryResolveDependencies();
         }
     }
 }

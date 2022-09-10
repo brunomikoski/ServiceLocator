@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using System;
+using UnityEditor;
 using UnityEngine;
 
 namespace BrunoMikoski.ServicesLocation
@@ -6,6 +7,7 @@ namespace BrunoMikoski.ServicesLocation
     public class ServiceLocatorSettings : ScriptableObjectForPreferences<ServiceLocatorSettings>
     {
         private const string DEFAULT_CODE_GENERATION_FOLDER_PATH = "Assets/Generated/Scripts";
+        private const string DEFAULT_SERVICES_NAME = "Services";
 
         [SerializeField]
         private string generatedScriptsFolderPath;
@@ -28,17 +30,25 @@ namespace BrunoMikoski.ServicesLocation
         private string referenceClassName = "Ref";
         public string ReferenceClassName => referenceClassName;
 
+        [SerializeField] 
+        private bool useDeepDependencySearch;
+        public bool UseDeepDependencySearch => useDeepDependencySearch;
 
-        [SerializeField]
-        private DependencySearchPattern[] searchPatterns = new DependencySearchPattern[]
+        [SerializeField] 
+        private string[] deepDependencySearchRegex = new string[]
         {
-            new DependencySearchPattern("Services.", new[] { '.', ';', ' ', '(' }),
-            new DependencySearchPattern("ServiceLocator.Instance.GetInstance<", new[] { '>' })
+            @"Services[\s]*\.[\s]*([\w+]+)",
+            @"ServiceLocator[\s]*\.[\s]*Instance[\s]*\.[\s]*GetInstance<([\w+]+)"
         };
+        public string[] DeepDependencySearchRegex => deepDependencySearchRegex;
 
-        public DependencySearchPattern[] SearchPatterns => searchPatterns;
-
-
+        
+        private static readonly GUIContent deepSearchGUIContent = new GUIContent(
+            "Deep Search",
+            "When using Deep Search, the service locator will try to find the Class TextAsset and parse it based " +
+            "on the search regex to find within dependencies");
+        
+ 
         [SettingsProvider]
         private static SettingsProvider SettingsProvider()
         {
@@ -51,7 +61,7 @@ namespace BrunoMikoski.ServicesLocation
             DefaultAsset defaultAsset = AssetDatabase.LoadAssetAtPath<DefaultAsset>(defaultGeneratedScriptsFolder
                 .stringValue);
 
-          
+            SerializedProperty servicesFileNameSerializedProperty = serializedObject.FindProperty(nameof(servicesFileName));
 
             using (EditorGUI.ChangeCheckScope changeCheck = new EditorGUI.ChangeCheckScope())
             {
@@ -61,12 +71,26 @@ namespace BrunoMikoski.ServicesLocation
                     defaultGeneratedScriptsFolder.stringValue = AssetDatabase.GetAssetPath(newFolder);
                     defaultGeneratedScriptsFolder.serializedObject.ApplyModifiedProperties();
                 }
-            }
+                
+                EditorGUILayout.PropertyField(servicesFileNameSerializedProperty);
+                EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(referenceClassName)));
+                SerializedProperty deepSearchSP = serializedObject.FindProperty(nameof(useDeepDependencySearch));
+                EditorGUILayout.PropertyField(deepSearchSP, deepSearchGUIContent);
+                
+                if (deepSearchSP.boolValue)
+                {
+                    EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(deepDependencySearchRegex)),deepSearchGUIContent);
+    
+                    if (!string.Equals(servicesFileNameSerializedProperty.stringValue, DEFAULT_SERVICES_NAME, StringComparison.Ordinal))
+                    {
+                        EditorGUILayout.HelpBox($"You might need to update the Deep Dependency Regex to match your new services filename",
+                            MessageType.Warning);
+                    }
+                }
 
-            SerializedProperty servicesFileNameSerializedProperty = serializedObject.FindProperty(nameof(servicesFileName));
-            EditorGUILayout.PropertyField(servicesFileNameSerializedProperty);
-            EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(referenceClassName)));
-            EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(searchPatterns)));
+                if (changeCheck.changed)
+                    serializedObject.ApplyModifiedProperties();
+            }
             
             if (defaultAsset == null)
             {
@@ -78,12 +102,6 @@ namespace BrunoMikoski.ServicesLocation
 
         }
 
-        public void OverrideCodeGenerationFolderPath(string targetScriptFolder)
-        {
-            generatedScriptsFolderPath = targetScriptFolder;
-            Changed();
-        }
-        
         private void Changed()
         {
             EditorUtility.SetDirty(this);

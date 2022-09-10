@@ -13,7 +13,7 @@ namespace BrunoMikoski.ServicesLocation
             GUILayout.Space(20);
             
             if (GUILayout.Button("Generate Static Services File"))
-                ServicesCodeGenerator.GenerateServicesClass();
+                ServiceLocatorCodeGenerator.GenerateServicesClass();
         }
     }
 }

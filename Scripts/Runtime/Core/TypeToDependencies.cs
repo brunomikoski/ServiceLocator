@@ -14,6 +14,9 @@ namespace BrunoMikoski.ServicesLocation
         private string[] dependenciesNames;
 
         private Type type;
+        public Type Type => type;
+
+        public Type[] Dependencies => dependencies;
         private Type[] dependencies;
 
         public TypeToDependencies(Type type, HashSet<Type> dependencies)

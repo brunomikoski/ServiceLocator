@@ -23,5 +23,19 @@ namespace BrunoMikoski.ServicesLocation
                 typeToDependencies.Parse();
             }
         }
+
+        public Type[] GetDependencies(Type targetType)
+        {
+            for (int i = 0; i < dependencyCache.Length; i++)
+            {
+                TypeToDependencies typeToDependencies = dependencyCache[i];
+                if (typeToDependencies.Type != targetType)
+                    continue;
+
+                return typeToDependencies.Dependencies;
+            }
+
+            return null;
+        }
     }
 }
