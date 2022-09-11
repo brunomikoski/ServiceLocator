@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using Object = UnityEngine.Object;
 #if UNITASK_ENABLED
@@ -32,6 +33,19 @@ namespace BrunoMikoski.ServicesLocation
         private Dictionary<IDependsOnServices, Type> waitingDependenciesBeResolvedToRegister =
             new Dictionary<IDependsOnServices, Type>();
 
+        private static DependencyCache dependencyCache = new DependencyCache();
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        private static void LoadAOTDependencies()
+        {
+            TextAsset aotFile = Resources.Load<TextAsset>("ServiceLocatorAOTDependencies");
+            if (aotFile == null)
+                return;
+
+            JsonUtility.FromJsonOverwrite(aotFile.text, dependencyCache);
+            dependencyCache.Parse();
+        }
+        
         public void RegisterInstance<T>(T instance)
         {
             Type type = typeof(T);
@@ -67,7 +81,7 @@ namespace BrunoMikoski.ServicesLocation
                 onRegistered.OnRegisteredOnServiceLocator(this);
             }
 
-            if (instance is IDependsOnServices serviceDependent)
+            if (instance is IDependsOnExplicitServices serviceDependent)
             {
                 serviceDependent.OnServicesDependenciesResolved();
             }
@@ -116,7 +130,7 @@ namespace BrunoMikoski.ServicesLocation
             {
                 Debug.LogError(
                     $"The Service {typeof(T)} is not yet registered on the ServiceLocator, " +
-                    $"consider implementing IDependsOnServices interface");
+                    $"consider implementing IDependsOnExplicitServices interface");
             }
             else
             {
@@ -147,7 +161,7 @@ namespace BrunoMikoski.ServicesLocation
         public void UnregisterAllServices()
         {
             List<object> activeInstances = new List<object>(typeToInstances.Count);
-            foreach (var typeToInstance in typeToInstances)
+            foreach (KeyValuePair<Type, object> typeToInstance in typeToInstances)
                 activeInstances.Add(typeToInstance.Value);
 
             for (int i = activeInstances.Count - 1; i >= 0; i--)
@@ -242,10 +256,20 @@ namespace BrunoMikoski.ServicesLocation
 
         private bool IsDependenciesResolved(IDependsOnServices dependsOnServices)
         {
-            for (int i = 0; i < dependsOnServices.DependsOnServices.Length; i++)
+            if (dependsOnServices is IDependsOnExplicitServices explicitServices)
             {
-                Type dependentType = dependsOnServices.DependsOnServices[i];
-                if (!HasService(dependentType))
+                for (int i = 0; i < explicitServices.DependsOnServices.Length; i++)
+                {
+                    if (!HasService(explicitServices.DependsOnServices[i]))
+                        return false;
+                }
+                return true;
+            }
+
+            Type[] dependencies = dependencyCache.GetDependencies(dependsOnServices.GetType());
+            for (int i = 0; i < dependencies.Length; i++)
+            {
+                if (!HasService(dependencies[i]))
                     return false;
             }
 
@@ -259,9 +283,23 @@ namespace BrunoMikoski.ServicesLocation
         }
 #endif
 
-        public void ResolveDependencies(IDependsOnServices serviceDependent)
+        public void ResolveDependencies(IDependsOnExplicitServices serviceDependent)
         {
             waitingOnDependenciesTobeResolved.Add(serviceDependent);
+            
+            TryResolveDependencies();
+        }
+
+        public void ResolveDependencies(IDependsOnServices dependsOnService)
+        {
+            Type[] dependencies = dependencyCache.GetDependencies(dependsOnService.GetType());
+            if (dependencies == null)
+            {
+                dependsOnService.OnServicesDependenciesResolved();
+                return;
+            }
+            
+            waitingOnDependenciesTobeResolved.Add(dependsOnService);
             TryResolveDependencies();
         }
     }

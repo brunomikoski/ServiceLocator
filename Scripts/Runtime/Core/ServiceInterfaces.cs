@@ -26,10 +26,15 @@ namespace BrunoMikoski.ServicesLocation
         void OnServiceRegistered(Type targetType);
         void OnServiceUnregistered(Type targetType);
     }
-    
-    public interface IDependsOnServices
+
+
+    public interface IDependsOnServices  
+    {
+        void OnServicesDependenciesResolved();
+    }
+
+    public interface IDependsOnExplicitServices : IDependsOnServices
     {
         Type[] DependsOnServices { get; }
-        void OnServicesDependenciesResolved();
     }
 }

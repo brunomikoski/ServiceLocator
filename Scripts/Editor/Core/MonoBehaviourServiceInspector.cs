@@ -28,7 +28,7 @@ namespace BrunoMikoski.ServicesLocation
                 string displayName = "";
                     
                 if (string.IsNullOrEmpty(serviceImplementationAttribute.Name))
-                    displayName = ServicesCodeGenerator.GetName(serviceImplementationAttribute);
+                    displayName = ServiceLocatorCodeGenerator.GetName(serviceImplementationAttribute);
                 else
                     displayName = serviceImplementationAttribute.Name;
 
