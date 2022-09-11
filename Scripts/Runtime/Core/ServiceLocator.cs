@@ -28,10 +28,10 @@ namespace BrunoMikoski.ServicesLocation
         private static Dictionary<Type, List<IServiceObservable>> typeToObservables =
             new Dictionary<Type, List<IServiceObservable>>();
 
-        private List<IDependsOnService> waitingOnDependenciesTobeResolved = new List<IDependsOnService>();
+        private List<IDependsOnServices> waitingOnDependenciesTobeResolved = new List<IDependsOnServices>();
 
-        private Dictionary<IDependsOnService, Type> waitingDependenciesBeResolvedToRegister =
-            new Dictionary<IDependsOnService, Type>();
+        private Dictionary<IDependsOnServices, Type> waitingDependenciesBeResolvedToRegister =
+            new Dictionary<IDependsOnServices, Type>();
 
         private static DependencyCache dependencyCache = new DependencyCache();
 
@@ -57,7 +57,7 @@ namespace BrunoMikoski.ServicesLocation
             if (!CanRegisterService(type, instance))
                 return;
 
-            if (instance is IDependsOnService serviceDependent)
+            if (instance is IDependsOnServices serviceDependent)
             {
                 if (!IsDependenciesResolved(serviceDependent))
                 {
@@ -238,7 +238,7 @@ namespace BrunoMikoski.ServicesLocation
         {
             for (int i = waitingOnDependenciesTobeResolved.Count - 1; i >= 0; i--)
             {
-                IDependsOnService dependsOnServices = waitingOnDependenciesTobeResolved[i];
+                IDependsOnServices dependsOnServices = waitingOnDependenciesTobeResolved[i];
                 if (!IsDependenciesResolved(dependsOnServices)) 
                     continue;
                 
@@ -254,7 +254,7 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        private bool IsDependenciesResolved(IDependsOnService dependsOnServices)
+        private bool IsDependenciesResolved(IDependsOnServices dependsOnServices)
         {
             if (dependsOnServices is IDependsOnExplicitServices explicitServices)
             {
@@ -290,7 +290,7 @@ namespace BrunoMikoski.ServicesLocation
             TryResolveDependencies();
         }
 
-        public void ResolveDependencies(IDependsOnService dependsOnService)
+        public void ResolveDependencies(IDependsOnServices dependsOnService)
         {
             Type[] dependencies = dependencyCache.GetDependencies(dependsOnService.GetType());
             if (dependencies == null)

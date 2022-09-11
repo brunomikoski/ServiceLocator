@@ -33,14 +33,14 @@ namespace BrunoMikoski.ServicesLocation
 
         public void Parse()
         {
-            string[] split = typeFullName.Split(":");
+            string[] split = typeFullName.Split(':');
 
             type = Assembly.Load(split[0]).GetType(split[1]);
 
             dependencies = new Type[dependenciesNames.Length];
             for (int i = 0; i < dependenciesNames.Length; i++)
             {
-                split = dependenciesNames[i].Split(":");
+                split = dependenciesNames[i].Split(':');
 
                 dependencies[i] = Assembly.Load(split[0]).GetType(split[1]);
             }

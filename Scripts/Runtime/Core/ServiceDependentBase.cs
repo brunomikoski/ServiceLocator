@@ -2,7 +2,7 @@
 
 namespace BrunoMikoski.ServicesLocation
 {
-    public abstract class ServiceDependentBase : IDependsOnService
+    public abstract class ServiceDependentBase : IDependsOnServices
     {
         public abstract void OnServicesDependenciesResolved();
         

@@ -24,7 +24,7 @@ namespace BrunoMikoski.ServicesLocation
         [MenuItem(GENERATE_AOT_DEPENDENCIES)]
         public static void GenerateAOTDependencisFile()
         {
-            TypeCache.TypeCollection types = TypeCache.GetTypesDerivedFrom<IDependsOnService>();
+            TypeCache.TypeCollection types = TypeCache.GetTypesDerivedFrom<IDependsOnServices>();
 
             DependencyCache dependencyCache = new DependencyCache();
             for (int i = 0; i < types.Count; i++)
