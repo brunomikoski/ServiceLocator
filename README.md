@@ -40,12 +40,49 @@ Simple service locator for Unity3D
  - Simple replace system
  - Simple and Fast
 
-## FAQ
+## FAQ (WIP)
+
+### Setup 
+The idea of the `ServiceLocator` is that you can have full control of initialization and lifetime of all your project services.
+The way I suggest doing this is creating different places for registering services, for instance you might have your Main services that are available everywhere, and you also have your gameplay Services and maybe Meta Services.
+So you would have 3 classes that extends `ServicesReporterBase` like `MainServiceReporter`, `GameplayServiceReporter` and `MetaServiceReporter` and they would report services on `RegisterServices()` and `UnregisterServices()`
+
+If you have a service that depends on other services, you can use the `IDependsOnServices` interface and allow the ServiceLocator take care of their initialization
+
+### Resolving Dependencies
+The system provides 2 ways of dealing with dependencies. 
+You can use both `IDependsOnServices` or `IDependsOnExplicitServices` interfaces to define dependencies
+
+#### IDependsOnServices
+This interface will try to find dependencies on your code and store this into a json file everytime you have script changes. So when you want the dependencies to be resolver you can use the `ServiceLocator.Instance.ResolveDependencies()` to make sure the class is initialized with all the dependencies resolved.
+
+#### IDependsOnExplicitServices
+Its almost the same as the `IDependsOnServices`, but this one allows you explicit state the dependencies on your classes.
+
+### Code Generation
+If you are using the code generation for services, any class that implements the `[ServiceImplementation]` will be added to the static `Service` file, so a class like this: 
+
+```csharp
+[ServiceImplementation(Category = "Main", Type = typeof(IFoo))]
+public class FooService : MonoBehaviour, IFoo
+{
+    
+}
+
+```
+
+Can be accessed by:
+`Services.Main.Foo`
+
+You can also directly access the ServiceReference that is a weak reference to check if the service is still exist or not
+
+`Services.Main.Ref.Foo`
+
 ### How I can register a service to be available
  You can register any service by using `ServiceLocator.Instance.RegisterInstance(serviceInstance);`
 
 ### How I can access one service.
-There's multiple ways of accessing it, you can use `ServiceLocator.Instance.GetInstance<T>` or you can use the `ServiceReference<T>` to access it
+There's multiple ways of accessing it, you can use `ServiceLocator.Instance.GetInstance<T>` or you can use the `ServiceReference<T>` to access it as well, or if you are using the code generation you can use the quick access like `Services.YourService`
 
 ## How to install
 
