@@ -22,7 +22,7 @@ namespace BrunoMikoski.ServicesLocation
         private static Dictionary<string, Type> nameToTypeCache = new Dictionary<string, Type>();
 
         [MenuItem(GENERATE_AOT_DEPENDENCIES)]
-        public static void GenerateAOTDependencisFile()
+        public static void GenerateAOTDependenciesFile()
         {
             TypeCache.TypeCollection types = TypeCache.GetTypesDerivedFrom<IDependsOnServices>();
 
@@ -128,7 +128,7 @@ namespace BrunoMikoski.ServicesLocation
 
         private static void LookForMatches(TextAsset classAsset, string regexSearch, ref HashSet<Type> dependencies)
         {
-            Regex regex = new Regex(regexSearch);
+            Regex regex = new Regex(regexSearch, RegexOptions.Compiled);
             MatchCollection matches = regex.Matches(classAsset.text);
             for (int i = 0; i < matches.Count; i++)
             {
@@ -163,7 +163,7 @@ namespace BrunoMikoski.ServicesLocation
             if (ServiceLocatorSettings.GetInstance().GenerateAOTDependencyFile &&
                 ServiceLocatorSettings.GetInstance().GenerateAOTDependencyFileOnScriptReload)
             {
-                GenerateAOTDependencisFile();
+                GenerateAOTDependenciesFile();
             }
         }
 

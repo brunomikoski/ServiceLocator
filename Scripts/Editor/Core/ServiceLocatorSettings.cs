@@ -46,7 +46,7 @@ namespace BrunoMikoski.ServicesLocation
         public bool SearchForDependencyOnFields => searchForDependencyOnFields;
 
         [SerializeField] 
-        private bool searchForDependenciesOnMethods = true;
+        private bool searchForDependenciesOnMethods;
         public bool SearchForDependenciesOnMethods => searchForDependenciesOnMethods;
         
         [SerializeField] 
@@ -57,6 +57,7 @@ namespace BrunoMikoski.ServicesLocation
         private string[] deepDependencySearchRegex = new string[]
         {
             @"Services[\s]*\.[\s]*([\w+]+)",
+            @"Services\s*\.\s*Ref\s*\.\s*([\w]+)",
             @"ServiceLocator[\s]*\.[\s]*Instance[\s]*\.[\s]*GetInstance<([\w+]+)"
         };
         public string[] DeepDependencySearchRegex => deepDependencySearchRegex;

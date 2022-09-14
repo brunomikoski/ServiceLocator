@@ -74,9 +74,7 @@ public class FooService : MonoBehaviour, IFoo
 Can be accessed by:
 `Services.Main.Foo`
 
-You can also directly access the ServiceReference that is a weak reference to check if the service is still exist or not
-
-`Services.Main.Ref.Foo`
+You can also directly access the ServiceReference that is a weak reference to check if the service is still exist or not `Services.Main.Ref.Foo`
 
 ### How I can register a service to be available
  You can register any service by using `ServiceLocator.Instance.RegisterInstance(serviceInstance);`
