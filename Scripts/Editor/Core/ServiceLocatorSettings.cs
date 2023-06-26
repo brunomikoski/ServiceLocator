@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 
 namespace BrunoMikoski.ServicesLocation
@@ -7,10 +6,9 @@ namespace BrunoMikoski.ServicesLocation
     public class ServiceLocatorSettings : ScriptableObjectForPreferences<ServiceLocatorSettings>
     {
         private const string DEFAULT_CODE_GENERATION_FOLDER_PATH = "Assets/Generated/Scripts";
-        private const string DEFAULT_SERVICES_NAME = "Services";
 
         [SerializeField]
-        private string generatedScriptsFolderPath;
+        private string generatedScriptsFolderPath = $"{DEFAULT_CODE_GENERATION_FOLDER_PATH}";
         public string GeneratedScriptsFolderPath
         {
             get
@@ -30,44 +28,9 @@ namespace BrunoMikoski.ServicesLocation
         public string ReferenceClassName => referenceClassName;
 
         [SerializeField] 
-        private bool generateStaticFileOnScriptReload = false;
+        private bool generateStaticFileOnScriptReload;
         public bool GenerateStaticFileOnScriptReload => generateStaticFileOnScriptReload;
 
-        [SerializeField] 
-        private bool generateAOTDependencyFile = true;
-        public bool GenerateAOTDependencyFile => generateAOTDependencyFile;
-
-        [SerializeField]
-        private bool generateAOTDependencyFileOnScriptReload = true;
-        public bool GenerateAOTDependencyFileOnScriptReload => generateAOTDependencyFileOnScriptReload;
-
-        [SerializeField]
-        private bool searchForDependencyOnFields = true;
-        public bool SearchForDependencyOnFields => searchForDependencyOnFields;
-
-        [SerializeField] 
-        private bool searchForDependenciesOnMethods;
-        public bool SearchForDependenciesOnMethods => searchForDependenciesOnMethods;
-        
-        [SerializeField] 
-        private bool useDeepDependencySearch;
-        public bool UseDeepDependencySearch => useDeepDependencySearch;
-
-        [SerializeField] 
-        private string[] deepDependencySearchRegex = new string[]
-        {
-            @"Services[\s]*\.[\s]*([\w+]+)",
-            @"Services\s*\.\s*Ref\s*\.\s*([\w]+)",
-            @"ServiceLocator[\s]*\.[\s]*Instance[\s]*\.[\s]*GetInstance<([\w+]+)"
-        };
-        public string[] DeepDependencySearchRegex => deepDependencySearchRegex;
-        
-        
-        private static readonly GUIContent deepSearchGUIContent = new GUIContent(
-            "Deep Search",
-            "When using Deep Search, the service locator will try to find the Class TextAsset and parse it based " +
-            "on the search regex to find within dependencies");
-        
  
         [SettingsProvider]
         private static SettingsProvider SettingsProvider()
@@ -83,7 +46,7 @@ namespace BrunoMikoski.ServicesLocation
 
             SerializedProperty servicesFileNameSerializedProperty = serializedObject.FindProperty(nameof(servicesFileName));
 
-            using (EditorGUI.ChangeCheckScope changeCheck = new EditorGUI.ChangeCheckScope())
+            using (EditorGUI.ChangeCheckScope changeCheck = new())
             {
                 EditorGUILayout.BeginVertical("Box");
                 EditorGUILayout.LabelField("Static Access File", EditorStyles.boldLabel);
@@ -102,35 +65,6 @@ namespace BrunoMikoski.ServicesLocation
 
                 EditorGUILayout.EndVertical();
 
-                EditorGUILayout.BeginVertical("Box");
-                EditorGUILayout.LabelField("AOT Dependencies File", EditorStyles.boldLabel);
-                EditorGUILayout.Space();
-                
-                SerializedProperty generateAOTDependencyFileSP = serializedObject.FindProperty(nameof(generateAOTDependencyFile));
-                EditorGUILayout.PropertyField(generateAOTDependencyFileSP);
-
-                if (generateAOTDependencyFileSP.boolValue)
-                {
-                    EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(searchForDependencyOnFields)));
-                    EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(searchForDependenciesOnMethods)));
-                    
-                    SerializedProperty deepSearchSP = serializedObject.FindProperty(nameof(useDeepDependencySearch));
-                    EditorGUILayout.PropertyField(deepSearchSP, deepSearchGUIContent);
-                
-                    if (deepSearchSP.boolValue)
-                    {
-                        EditorGUILayout.PropertyField(serializedObject.FindProperty(nameof(deepDependencySearchRegex)),deepSearchGUIContent);
-    
-                        if (!string.Equals(servicesFileNameSerializedProperty.stringValue, DEFAULT_SERVICES_NAME, StringComparison.Ordinal))
-                        {
-                            EditorGUILayout.HelpBox($"You might need to update the Deep Dependency Regex to match your new services filename",
-                                MessageType.Warning);
-                        }
-                    }
-                }
-                
-                EditorGUILayout.EndVertical();
-
                 if (changeCheck.changed)
                     serializedObject.ApplyModifiedProperties();
             }
@@ -145,10 +79,5 @@ namespace BrunoMikoski.ServicesLocation
 
         }
 
-        private void Changed()
-        {
-            EditorUtility.SetDirty(this);
-            AssetDatabase.SaveAssets();
-        }
     }
 }

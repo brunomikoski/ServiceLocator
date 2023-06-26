@@ -21,20 +21,14 @@ namespace BrunoMikoski.ServicesLocation
         void OnUnregisteredFromServiceLocator(ServiceLocator serviceLocator);
     }
 
+    public interface IOnInjected
+    {
+        void OnInjected();
+    }
+
     public interface IServiceObservable
     {
         void OnServiceRegistered(Type targetType);
         void OnServiceUnregistered(Type targetType);
-    }
-
-
-    public interface IDependsOnServices  
-    {
-        void OnServicesDependenciesResolved();
-    }
-
-    public interface IDependsOnExplicitServices : IDependsOnServices
-    {
-        Type[] DependsOnServices { get; }
     }
 }
