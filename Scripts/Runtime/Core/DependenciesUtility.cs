@@ -21,7 +21,11 @@ namespace BrunoMikoski.ServicesLocation
 
         public static bool Inject(object targetObject)
         {
-            return UpdateDependencies(targetObject);
+            bool allResolved = UpdateDependencies(targetObject);
+            if (targetObject is IOnInjected onInjected)
+                onInjected.OnInjected();
+            
+            return allResolved;
         }
 
         public static List<Type> GetDependencies(object targetObject)
@@ -48,10 +52,10 @@ namespace BrunoMikoski.ServicesLocation
             for (int i = 0; i < dependencies.Count; i++)
             {
                 Type dependency = dependencies[i];
-                object serviceInstance = ServiceLocator.Instance.GetRawInstance(dependency);
-                if (serviceInstance != null)
-                    continue;
 
+                if (ServiceLocator.Instance.HasService(dependency))
+                    continue;
+                
                 unresolvedDependencies.Add(dependency);
             }
 
@@ -64,10 +68,9 @@ namespace BrunoMikoski.ServicesLocation
             Type type = targetObject.GetType();
             if (typeToFieldToTypeDependencyCache.TryGetValue(type, out Dictionary<MemberInfo, Type> fieldToTypeDependencyCache))
             {
-                foreach (KeyValuePair<MemberInfo, Type> fieldToType in fieldToTypeDependencyCache)
+                foreach (var fieldToType in fieldToTypeDependencyCache)
                 {
-                    object service = ServiceLocator.Instance.GetRawInstance(fieldToType.Value);
-                    if (service == null)
+                    if (!ServiceLocator.Instance.TryGetRawInstance(fieldToType.Value, out object service))
                     {
                         allDependenciesResolved = false;
                         continue;
@@ -96,9 +99,7 @@ namespace BrunoMikoski.ServicesLocation
                     fieldToTypeDependencyCache.Add(field, serviceType);
                     dependencies.Add(serviceType);
                     
-                    object service = ServiceLocator.Instance.GetRawInstance(serviceType);
-                    
-                    if (service == null)
+                    if (!ServiceLocator.Instance.TryGetRawInstance(serviceType, out object service))
                     {
                         allDependenciesResolved = false;
                         continue;

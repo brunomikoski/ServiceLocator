@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using Object = UnityEngine.Object;
 #if UNITASK_ENABLED
@@ -97,7 +98,7 @@ namespace BrunoMikoski.ServicesLocation
             return HasService(typeof(T));
         }
 
-        private bool HasService(Type type)
+        public bool HasService(Type type)
         {
             return typeToInstances.ContainsKey(type);
         }
@@ -107,42 +108,74 @@ namespace BrunoMikoski.ServicesLocation
             Type type = typeof(T);
             return (T) GetRawInstance(type);
         }
+        
+        
+        public bool TryGetRawInstance<T>(out T targetInstance) where T : class
+        {
+            Type type = typeof(T);
+            if (TryGetRawInstance(type, out object resultInstance))
+            {
+                targetInstance = (T) resultInstance;
+                return true;
+            }
+
+            targetInstance = null;
+            return false;
+        }
+        
+        public bool TryGetRawInstance(Type targetType, out object targetInstance)
+        {
+            if (typeToInstances.TryGetValue(targetType, out targetInstance))
+                return true;
+
+            if (Application.isPlaying)
+                return false;
+
+            if (targetType.IsSubclassOf(typeof(Object)))
+            {
+                targetInstance = Object.FindObjectOfType(targetType);
+                if (targetInstance != null)
+                {
+                    typeToInstances.Add(targetType, targetInstance);
+                    return true;
+                }
+#if UNITY_EDITOR
+                string[] guids = UnityEditor.AssetDatabase.FindAssets($"{targetType} t:Prefab");
+                if (guids.Length > 0)
+                {
+                    targetInstance = UnityEditor.AssetDatabase.LoadAssetAtPath(
+                        UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]), targetType);
+                    
+                    if (targetInstance != null)
+                    {
+                        typeToInstances.Add(targetType, targetInstance);
+                        return true;
+                    }
+                }
+#endif               
+                return false;
+            }
+
+            targetInstance = Activator.CreateInstance(targetType);
+            if (targetInstance != null)
+            {
+                typeToInstances.Add(targetType, targetInstance);
+                return true;
+            }
+
+            return false;
+        }
 
         public object GetRawInstance(Type targetType)
         {
-            if (typeToInstances.TryGetValue(targetType, out object instanceObject))
-                return instanceObject;
-
-            if (Application.isPlaying)
+            if (!TryGetRawInstance(targetType, out object targetInstance))
             {
                 Debug.LogError(
                     $"The Service {targetType} is not yet registered on the ServiceLocator, " +
-                    $"consider implementing IDependsOnExplicitServices interface");
+                    $"consider using the Async Inject to wait for the service, or adding the Callback when Injecting");
+                return null;
             }
-            else
-            {
-                if (targetType.IsSubclassOf(typeof(Object)))
-                {
-                    Object instanceType = Object.FindObjectOfType(targetType);
-                    if (instanceType != null)
-                        return instanceType;
-#if UNITY_EDITOR
-                    string[] guids = UnityEditor.AssetDatabase.FindAssets($"{targetType} t:Prefab");
-                    if (guids.Length > 0)
-                    {
-                        return UnityEditor.AssetDatabase.LoadAssetAtPath(
-                            UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]), targetType);
-                    }
-#endif                    
-                    Debug.LogError($"Failed to find any Object of type: {targetType}, check if the object you need is available on the scene");
-                    return null;
-                }
-
-                object instance = Activator.CreateInstance(targetType);
-                return instance;
-            }
-            
-            return null;
+            return targetInstance;
         }
         
 
@@ -226,21 +259,25 @@ namespace BrunoMikoski.ServicesLocation
             for (int i = waitingOnDependenciesTobeResolved.Count - 1; i >= 0; i--)
             {
                 object waitingObject = waitingOnDependenciesTobeResolved[i];
-                
-                if (!IsServiceDependenciesResolved(waitingObject.GetType())) 
+
+                Type targetType = waitingObject.GetType();
+                if (!IsServiceDependenciesResolved(targetType)) 
                     continue;
                 
                 waitingOnDependenciesTobeResolved.Remove(waitingObject);
-                RegisterInstance(waitingObject);
+                RegisterInstance(targetType, waitingObject);
             }
 
-            foreach (var listToCallback in servicesListToCallback)
+            List<Type>[] items = servicesListToCallback.Keys.ToArray();
+
+            for (int i = 0; i < items.Length; i++)
             {
-                if (!HasAllServices(listToCallback.Key))
+                List<Type> item = items[i];
+                if (!HasAllServices(item))
                     continue;
-                
-                listToCallback.Value.Invoke();
-                servicesListToCallback.Remove(listToCallback.Key);
+
+                servicesListToCallback[item].Invoke();
+                servicesListToCallback.Remove(item);
             }
         }
 
@@ -275,12 +312,7 @@ namespace BrunoMikoski.ServicesLocation
         {
             bool allResolved = DependenciesUtility.Inject(targetObject);
             if (allResolved)
-            {
-                if (targetObject is IOnInjected onInjected)
-                    onInjected.OnInjected();
-               
                 return;
-            }
            
             if (callback == null)
             {
@@ -292,10 +324,8 @@ namespace BrunoMikoski.ServicesLocation
                
             AddServicesRegisteredCallback(unresolvedDependencies, () =>
             {
-                if (targetObject is IOnInjected onInjected)
-                    onInjected.OnInjected();
-
-                callback.Invoke();
+                DependenciesUtility.Inject(targetObject);
+                callback();
             });
         }
 
@@ -325,8 +355,7 @@ namespace BrunoMikoski.ServicesLocation
 
             await UniTask.WhenAll(dependenciesTasks);
 
-            if (script is IOnInjected onInjected)
-                onInjected.OnInjected();
+            DependenciesUtility.Inject(script);
         }
         
         
