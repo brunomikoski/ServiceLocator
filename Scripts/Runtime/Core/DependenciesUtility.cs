@@ -19,7 +19,7 @@ namespace BrunoMikoski.ServicesLocation
             typeToFieldToTypeDependencyCache.Clear();
         }
 
-        public static bool Inject(object targetObject)
+        internal static bool Inject(object targetObject)
         {
             bool allResolved = UpdateDependencies(targetObject);
             if (targetObject is IOnInjected onInjected)
@@ -28,7 +28,7 @@ namespace BrunoMikoski.ServicesLocation
             return allResolved;
         }
 
-        public static List<Type> GetDependencies(object targetObject)
+        internal static List<Type> GetDependencies(object targetObject)
         {
             Type objectType = targetObject.GetType();
 
@@ -45,7 +45,7 @@ namespace BrunoMikoski.ServicesLocation
             return dependencies;
         }
 
-        public static List<Type> GetUnresolvedDependencies(object targetObject)
+        internal static List<Type> GetUnresolvedDependencies(object targetObject)
         {
             List<Type> dependencies = GetDependencies(targetObject);
             List<Type> unresolvedDependencies = new List<Type>();
