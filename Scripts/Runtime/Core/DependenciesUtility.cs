@@ -11,7 +11,7 @@ namespace BrunoMikoski.ServicesLocation
 
         private static Dictionary<Type, List<Type>> typeToDependencyListCache = new();
         private static Dictionary<Type, Dictionary<MemberInfo, Type>> typeToFieldToTypeDependencyCache = new();
-        
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ClearStaticReferences()
         {

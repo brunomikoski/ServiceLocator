@@ -31,6 +31,9 @@ namespace BrunoMikoski.ServicesLocation
         private List<object> waitingOnDependenciesTobeResolved = new();
         
         private Dictionary<List<Type>, Action> servicesListToCallback = new();
+        
+        private HashSet<object> injectedObjects = new();
+
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ClearStaticReferences()
@@ -310,9 +313,18 @@ namespace BrunoMikoski.ServicesLocation
 
         public void Inject(object targetObject, Action callback = null)
         {
+            if (injectedObjects.Contains(targetObject))
+            {
+                Debug.LogWarning($"Trying to inject {targetObject} that was already injected, skipping");
+                return;
+            }
+            
             bool allResolved = DependenciesUtility.Inject(targetObject);
             if (allResolved)
+            {
+                injectedObjects.Add(targetObject);
                 return;
+            }
            
             if (callback == null)
             {
