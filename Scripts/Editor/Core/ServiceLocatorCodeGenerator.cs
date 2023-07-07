@@ -42,7 +42,7 @@ namespace BrunoMikoski.ServicesLocation
             if (Application.isPlaying || !Application.isEditor || Application.isBatchMode)
                 return;
 
-            if (ServiceLocatorSettings.GetInstance().GenerateStaticFileOnScriptReload)
+            if(ServiceLocatorSettings.Instance.GenerateStaticFileOnScriptReload)
             {
                 GenerateServicesClass();
             }
@@ -52,7 +52,7 @@ namespace BrunoMikoski.ServicesLocation
         internal static bool GenerateServicesClass()
         {
             categoryToAttributesList.Clear();
-            ServiceLocatorSettings serviceLocatorSettings = ServiceLocatorSettings.GetInstance();
+            ServiceLocatorSettings serviceLocatorSettings = ServiceLocatorSettings.Instance;
             string servicesClassName = serviceLocatorSettings.ServicesFileName;
             string referencesClassName = serviceLocatorSettings.ReferenceClassName;
             string targetScriptFolder = serviceLocatorSettings.GeneratedScriptsFolderPath;

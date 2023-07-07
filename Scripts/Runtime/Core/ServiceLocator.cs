@@ -106,6 +106,20 @@ namespace BrunoMikoski.ServicesLocation
             return typeToInstances.ContainsKey(type);
         }
 
+        public bool TryGetInstance<T>(out T targetService) where T : class
+        {
+            Type type = typeof(T);
+            if (TryGetRawInstance(type, out object result))
+            {
+                targetService = result as T;
+                return targetService != null;
+            }
+
+            targetService = null;
+            return false;
+        }
+
+        
         public T GetInstance<T>() where T : class
         {
             Type type = typeof(T);
@@ -399,5 +413,6 @@ namespace BrunoMikoski.ServicesLocation
 
             return true;
         }
+
     }
 }
