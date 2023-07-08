@@ -61,16 +61,14 @@ namespace BrunoMikoski.ServicesLocation
             }
             
             typeToInstances.Add(type, instance);
-            TryResolveDependencies();
             DispatchOnRegistered(type, instance);
+            TryResolveDependencies();
         }
 
         private void DispatchOnRegistered(Type type, object instance)
         {
             if (instance is IOnServiceRegistered onRegistered)
-            {
                 onRegistered.OnRegisteredOnServiceLocator(this);
-            }
 
             if (typeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
             {
