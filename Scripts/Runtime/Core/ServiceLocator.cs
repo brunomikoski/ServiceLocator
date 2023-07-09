@@ -28,7 +28,7 @@ namespace BrunoMikoski.ServicesLocation
 
         private Dictionary<Type, List<IServiceObservable>> typeToObservables = new();
 
-        private List<object> waitingOnDependenciesTobeResolved = new();
+        private Dictionary<Type, object> waitingOnDependenciesTobeResolved = new();
         
         private Dictionary<List<Type>, Action> servicesListToCallback = new();
         
@@ -47,22 +47,21 @@ namespace BrunoMikoski.ServicesLocation
             RegisterInstance(type, instance);
         }
 
-        private void RegisterInstance(Type type, object instance)
+        private void RegisterInstance(Type type, object instance, bool tryResolveDependencies = true)
         {
             if (!CanRegisterService(type, instance))
                 return;
 
             if (!IsServiceDependenciesResolved(type))
             {
-                if (!waitingOnDependenciesTobeResolved.Contains(instance))
-                    waitingOnDependenciesTobeResolved.Add(instance);
-                
+                waitingOnDependenciesTobeResolved.Add(type, instance);
                 return;
             }
             
             typeToInstances.Add(type, instance);
             DispatchOnRegistered(type, instance);
-            TryResolveDependencies();
+            if (tryResolveDependencies)
+                TryResolveDependencies();
         }
 
         private void DispatchOnRegistered(Type type, object instance)
@@ -271,16 +270,21 @@ namespace BrunoMikoski.ServicesLocation
 
         private void TryResolveDependencies()
         {
-            for (int i = waitingOnDependenciesTobeResolved.Count - 1; i >= 0; i--)
+            bool anyNewServiceRegistered = false;
+            Dictionary<Type, object> resolvedDependencies = new Dictionary<Type, object>();
+            foreach (var typeToInstance in waitingOnDependenciesTobeResolved)
             {
-                object waitingObject = waitingOnDependenciesTobeResolved[i];
-
-                Type targetType = waitingObject.GetType();
-                if (!IsServiceDependenciesResolved(targetType)) 
+                if (!IsServiceDependenciesResolved(typeToInstance.Key)) 
                     continue;
-                
-                waitingOnDependenciesTobeResolved.Remove(waitingObject);
-                RegisterInstance(targetType, waitingObject);
+
+                resolvedDependencies.Add(typeToInstance.Key, typeToInstance.Value);
+            }
+
+            foreach (var resolvedTypeToObj in resolvedDependencies)
+            {
+                waitingOnDependenciesTobeResolved.Remove(resolvedTypeToObj.Key);
+                RegisterInstance(resolvedTypeToObj.Key, resolvedTypeToObj.Value, false);
+                anyNewServiceRegistered = true;
             }
 
             List<Type>[] items = servicesListToCallback.Keys.ToArray();
@@ -294,6 +298,9 @@ namespace BrunoMikoski.ServicesLocation
                 servicesListToCallback[item].Invoke();
                 servicesListToCallback.Remove(item);
             }
+
+            if (anyNewServiceRegistered)
+                TryResolveDependencies();
         }
 
         private bool IsServiceDependenciesResolved(Type targetType)
