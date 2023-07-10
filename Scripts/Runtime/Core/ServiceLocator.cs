@@ -24,16 +24,17 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        private Dictionary<Type, object> typeToInstances = new();
+        private Dictionary<Type, object> serviceTypeToInstances = new();
 
-        private Dictionary<Type, List<IServiceObservable>> typeToObservables = new();
+        private Dictionary<Type, List<IServiceObservable>> serviceTypeToObservables = new();
 
-        private Dictionary<Type, object> waitingOnDependenciesTobeResolved = new();
+        private Dictionary<Type, object> servicesWaitingOnDependenciesTobeResolved = new();
         
         private Dictionary<List<Type>, Action> servicesListToCallback = new();
         
         private HashSet<object> injectedObjects = new();
 
+        private HashSet<Type> servicesTypeRegisteredOnce = new();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ClearStaticReferences()
@@ -54,14 +55,19 @@ namespace BrunoMikoski.ServicesLocation
 
             if (!IsServiceDependenciesResolved(type))
             {
-                waitingOnDependenciesTobeResolved.Add(type, instance);
+                servicesWaitingOnDependenciesTobeResolved.Add(type, instance);
                 return;
             }
             
-            typeToInstances.Add(type, instance);
+            serviceTypeToInstances.Add(type, instance);
             DispatchOnRegistered(type, instance);
             if (tryResolveDependencies)
                 TryResolveDependencies();
+
+            if (servicesTypeRegisteredOnce.Contains(type))
+                DependenciesUtility.RefreshInjectedMembers(type, instance);
+
+            servicesTypeRegisteredOnce.Add(type);
         }
 
         private void DispatchOnRegistered(Type type, object instance)
@@ -69,7 +75,7 @@ namespace BrunoMikoski.ServicesLocation
             if (instance is IOnServiceRegistered onRegistered)
                 onRegistered.OnRegisteredOnServiceLocator(this);
 
-            if (typeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
+            if (serviceTypeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
             {
                 for (int i = 0; i < observables.Count; i++)
                     observables[i].OnServiceRegistered(type);
@@ -100,7 +106,7 @@ namespace BrunoMikoski.ServicesLocation
 
         public bool HasService(Type type)
         {
-            return typeToInstances.ContainsKey(type);
+            return serviceTypeToInstances.ContainsKey(type);
         }
 
         public bool TryGetInstance<T>(out T targetService) where T : class
@@ -139,7 +145,7 @@ namespace BrunoMikoski.ServicesLocation
         
         public bool TryGetRawInstance(Type targetType, out object targetInstance)
         {
-            if (typeToInstances.TryGetValue(targetType, out targetInstance))
+            if (serviceTypeToInstances.TryGetValue(targetType, out targetInstance))
                 return true;
 
             if (Application.isPlaying)
@@ -150,7 +156,7 @@ namespace BrunoMikoski.ServicesLocation
                 targetInstance = Object.FindObjectOfType(targetType);
                 if (targetInstance != null)
                 {
-                    typeToInstances.Add(targetType, targetInstance);
+                    serviceTypeToInstances.Add(targetType, targetInstance);
                     return true;
                 }
 #if UNITY_EDITOR
@@ -162,7 +168,7 @@ namespace BrunoMikoski.ServicesLocation
                     
                     if (targetInstance != null)
                     {
-                        typeToInstances.Add(targetType, targetInstance);
+                        serviceTypeToInstances.Add(targetType, targetInstance);
                         return true;
                     }
                 }
@@ -173,7 +179,7 @@ namespace BrunoMikoski.ServicesLocation
             targetInstance = Activator.CreateInstance(targetType);
             if (targetInstance != null)
             {
-                typeToInstances.Add(targetType, targetInstance);
+                serviceTypeToInstances.Add(targetType, targetInstance);
                 return true;
             }
 
@@ -195,8 +201,8 @@ namespace BrunoMikoski.ServicesLocation
 
         public void UnregisterAllServices()
         {
-            List<object> activeInstances = new List<object>(typeToInstances.Count);
-            foreach (KeyValuePair<Type, object> typeToInstance in typeToInstances)
+            List<object> activeInstances = new List<object>(serviceTypeToInstances.Count);
+            foreach (KeyValuePair<Type, object> typeToInstance in serviceTypeToInstances)
                 activeInstances.Add(typeToInstance.Value);
 
             for (int i = activeInstances.Count - 1; i >= 0; i--)
@@ -204,13 +210,13 @@ namespace BrunoMikoski.ServicesLocation
                 UnregisterInstance(activeInstances[i]);
             }
             
-            typeToInstances.Clear();
+            serviceTypeToInstances.Clear();
 
-            if (waitingOnDependenciesTobeResolved.Count > 0)
+            if (servicesWaitingOnDependenciesTobeResolved.Count > 0)
             {
-                Debug.LogWarning($"{waitingOnDependenciesTobeResolved.Count} dependencies was waiting to be resolved");
-                waitingOnDependenciesTobeResolved.Clear();
-                typeToObservables.Clear();
+                Debug.LogWarning($"{servicesWaitingOnDependenciesTobeResolved.Count} dependencies was waiting to be resolved");
+                servicesWaitingOnDependenciesTobeResolved.Clear();
+                serviceTypeToObservables.Clear();
             }
         }
         
@@ -228,11 +234,11 @@ namespace BrunoMikoski.ServicesLocation
 
         public void UnregisterInstance(Type targetType)
         {
-            if (!typeToInstances.TryGetValue(targetType, out object serviceInstance)) 
+            if (!serviceTypeToInstances.TryGetValue(targetType, out object serviceInstance)) 
                 return;
             
             DispatchOnUnregisteredService(targetType, serviceInstance);
-            typeToInstances.Remove(targetType);
+            serviceTypeToInstances.Remove(targetType);
         }
 
         private void DispatchOnUnregisteredService(Type targetType, object serviceInstance)
@@ -242,7 +248,7 @@ namespace BrunoMikoski.ServicesLocation
                 onServiceUnregistered.OnUnregisteredFromServiceLocator(this);
             }
             
-            if (typeToObservables.TryGetValue(targetType, out List<IServiceObservable> observables))
+            if (serviceTypeToObservables.TryGetValue(targetType, out List<IServiceObservable> observables))
             {
                 for (int i = 0; i < observables.Count; i++)
                     observables[i].OnServiceUnregistered(targetType);
@@ -252,17 +258,17 @@ namespace BrunoMikoski.ServicesLocation
         public void SubscribeToServiceChanges<T>(IServiceObservable observable)
         {
             Type type = typeof(T);
-            if (!typeToObservables.ContainsKey(type))
-                typeToObservables.Add(type, new List<IServiceObservable>());
+            if (!serviceTypeToObservables.ContainsKey(type))
+                serviceTypeToObservables.Add(type, new List<IServiceObservable>());
 
-            if (!typeToObservables[type].Contains(observable))
-                typeToObservables[type].Add(observable);
+            if (!serviceTypeToObservables[type].Contains(observable))
+                serviceTypeToObservables[type].Add(observable);
         }
         
         public void UnsubscribeToServiceChanges<T>(IServiceObservable observable)
         {
             Type type = typeof(T);
-            if (!typeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
+            if (!serviceTypeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
                 return;
 
             observables.Remove(observable);
@@ -272,7 +278,7 @@ namespace BrunoMikoski.ServicesLocation
         {
             bool anyNewServiceRegistered = false;
             Dictionary<Type, object> resolvedDependencies = new Dictionary<Type, object>();
-            foreach (var typeToInstance in waitingOnDependenciesTobeResolved)
+            foreach (var typeToInstance in servicesWaitingOnDependenciesTobeResolved)
             {
                 if (!IsServiceDependenciesResolved(typeToInstance.Key)) 
                     continue;
@@ -282,7 +288,7 @@ namespace BrunoMikoski.ServicesLocation
 
             foreach (var resolvedTypeToObj in resolvedDependencies)
             {
-                waitingOnDependenciesTobeResolved.Remove(resolvedTypeToObj.Key);
+                servicesWaitingOnDependenciesTobeResolved.Remove(resolvedTypeToObj.Key);
                 RegisterInstance(resolvedTypeToObj.Key, resolvedTypeToObj.Value, false);
                 anyNewServiceRegistered = true;
             }
