@@ -15,8 +15,7 @@ namespace BrunoMikoski.ServicesLocation
             {
                 if (IsNullOrDestroyed(instance))
                 {
-                    instance = ServiceLocator.Instance.GetInstance<T>();
-                    if (instance != null)
+                    if (ServiceLocator.Instance.TryGetInstance(out instance))
                         ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
                 }
                 return instance;
@@ -49,11 +48,13 @@ namespace BrunoMikoski.ServicesLocation
 
         void IServiceObservable.OnServiceRegistered(Type targetType)
         {
-            T newServiceRegistered = ServiceLocator.Instance.GetInstance<T>();
-            if (Equals(newServiceRegistered, instance))
+            if (!ServiceLocator.Instance.TryGetInstance(out T newInstance))
+                return;
+            
+            if (Equals(newInstance, instance))
                 return;
 
-            instance = newServiceRegistered;
+            instance = newInstance;
         }
 
         void IServiceObservable.OnServiceUnregistered(Type targetType)

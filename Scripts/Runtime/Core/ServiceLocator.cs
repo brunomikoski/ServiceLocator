@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
+using System.Linq;
 using UnityEngine;
 using Object = UnityEngine.Object;
 #if UNITASK_ENABLED
+using System.Threading;
 using Cysharp.Threading.Tasks;
 #endif
 
@@ -23,27 +24,22 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        private static Dictionary<Type, object> typeToInstances = new Dictionary<Type, object>();
+        private Dictionary<Type, object> serviceTypeToInstances = new();
 
-        private static Dictionary<Type, List<IServiceObservable>> typeToObservables =
-            new Dictionary<Type, List<IServiceObservable>>();
+        private Dictionary<Type, List<IServiceObservable>> serviceTypeToObservables = new();
 
-        private List<IDependsOnServices> waitingOnDependenciesTobeResolved = new List<IDependsOnServices>();
+        private Dictionary<Type, object> servicesWaitingOnDependenciesTobeResolved = new();
+        
+        private Dictionary<List<Type>, Action> servicesListToCallback = new();
+        
+        private HashSet<object> injectedObjects = new();
 
-        private Dictionary<IDependsOnServices, Type> waitingDependenciesBeResolvedToRegister =
-            new Dictionary<IDependsOnServices, Type>();
+        private HashSet<Type> servicesTypeRegisteredOnce = new();
 
-        private static DependencyCache dependencyCache = new DependencyCache();
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-        private static void LoadAOTDependencies()
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ClearStaticReferences()
         {
-            TextAsset aotFile = Resources.Load<TextAsset>("ServiceLocatorAOTDependencies");
-            if (aotFile == null)
-                return;
-
-            JsonUtility.FromJsonOverwrite(aotFile.text, dependencyCache);
-            dependencyCache.Parse();
+            instance = null;
         }
         
         public void RegisterInstance<T>(T instance)
@@ -52,41 +48,34 @@ namespace BrunoMikoski.ServicesLocation
             RegisterInstance(type, instance);
         }
 
-        private void RegisterInstance(Type type, object instance)
+        private void RegisterInstance(Type type, object instance, bool tryResolveDependencies = true)
         {
             if (!CanRegisterService(type, instance))
                 return;
 
-            if (instance is IDependsOnServices serviceDependent)
+            if (!IsServiceDependenciesResolved(type))
             {
-                if (!IsDependenciesResolved(serviceDependent))
-                {
-                    if (!waitingOnDependenciesTobeResolved.Contains(serviceDependent))
-                        waitingOnDependenciesTobeResolved.Add(serviceDependent);
-
-                    waitingDependenciesBeResolvedToRegister.Add(serviceDependent, type);
-                    return;
-                }
+                servicesWaitingOnDependenciesTobeResolved.Add(type, instance);
+                return;
             }
             
-            typeToInstances.Add(type, instance);
-            TryResolveDependencies();
+            serviceTypeToInstances.Add(type, instance);
             DispatchOnRegistered(type, instance);
+            if (tryResolveDependencies)
+                TryResolveDependencies();
+
+            if (servicesTypeRegisteredOnce.Contains(type))
+                DependenciesUtility.RefreshInjectedMembers(type, instance);
+
+            servicesTypeRegisteredOnce.Add(type);
         }
 
         private void DispatchOnRegistered(Type type, object instance)
         {
             if (instance is IOnServiceRegistered onRegistered)
-            {
                 onRegistered.OnRegisteredOnServiceLocator(this);
-            }
 
-            if (instance is IDependsOnExplicitServices serviceDependent)
-            {
-                serviceDependent.OnServicesDependenciesResolved();
-            }
-
-            if (typeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
+            if (serviceTypeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
             {
                 for (int i = 0; i < observables.Count; i++)
                     observables[i].OnServiceRegistered(type);
@@ -115,53 +104,105 @@ namespace BrunoMikoski.ServicesLocation
             return HasService(typeof(T));
         }
 
-        private bool HasService(Type type)
+        public bool HasService(Type type)
         {
-            return typeToInstances.ContainsKey(type);
+            return serviceTypeToInstances.ContainsKey(type);
         }
 
+        public bool TryGetInstance<T>(out T targetService) where T : class
+        {
+            Type type = typeof(T);
+            if (TryGetRawInstance(type, out object result))
+            {
+                targetService = result as T;
+                return targetService != null;
+            }
+
+            targetService = null;
+            return false;
+        }
+
+        
         public T GetInstance<T>() where T : class
         {
             Type type = typeof(T);
-            if (typeToInstances.TryGetValue(type, out object instanceObject))
-                return instanceObject as T;
+            return (T) GetRawInstance(type);
+        }
+        
+        
+        public bool TryGetRawInstance<T>(out T targetInstance) where T : class
+        {
+            Type type = typeof(T);
+            if (TryGetRawInstance(type, out object resultInstance))
+            {
+                targetInstance = (T) resultInstance;
+                return true;
+            }
+
+            targetInstance = null;
+            return false;
+        }
+        
+        public bool TryGetRawInstance(Type targetType, out object targetInstance)
+        {
+            if (serviceTypeToInstances.TryGetValue(targetType, out targetInstance))
+                return true;
 
             if (Application.isPlaying)
+                return false;
+
+            if (targetType.IsSubclassOf(typeof(Object)))
+            {
+                targetInstance = Object.FindObjectOfType(targetType);
+                if (targetInstance != null)
+                {
+                    serviceTypeToInstances.Add(targetType, targetInstance);
+                    return true;
+                }
+#if UNITY_EDITOR
+                string[] guids = UnityEditor.AssetDatabase.FindAssets($"{targetType} t:Prefab");
+                if (guids.Length > 0)
+                {
+                    targetInstance = UnityEditor.AssetDatabase.LoadAssetAtPath(
+                        UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]), targetType);
+                    
+                    if (targetInstance != null)
+                    {
+                        serviceTypeToInstances.Add(targetType, targetInstance);
+                        return true;
+                    }
+                }
+#endif               
+                return false;
+            }
+
+            targetInstance = Activator.CreateInstance(targetType);
+            if (targetInstance != null)
+            {
+                serviceTypeToInstances.Add(targetType, targetInstance);
+                return true;
+            }
+
+            return false;
+        }
+
+        public object GetRawInstance(Type targetType)
+        {
+            if (!TryGetRawInstance(targetType, out object targetInstance))
             {
                 Debug.LogError(
-                    $"The Service {typeof(T)} is not yet registered on the ServiceLocator, " +
-                    $"consider implementing IDependsOnExplicitServices interface");
+                    $"The Service {targetType} is not yet registered on the ServiceLocator, " +
+                    $"consider using the Async Inject to wait for the service, or adding the Callback when Injecting");
+                return null;
             }
-            else
-            {
-                if (type.IsSubclassOf(typeof(Object)))
-                {
-                    Object instanceType = Object.FindObjectOfType(type);
-                    if (instanceType != null)
-                        return instanceType as T;
-#if UNITY_EDITOR
-                    string[] guids = UnityEditor.AssetDatabase.FindAssets($"{type.Name} t:Prefab");
-                    if (guids.Length > 0)
-                    {
-                        return UnityEditor.AssetDatabase.LoadAssetAtPath(
-                            UnityEditor.AssetDatabase.GUIDToAssetPath(guids[0]), type) as T;
-                    }
-#endif                    
-                    Debug.LogError($"Failed to find any Object of type: {typeof(T)}, check if the object you need is available on the scene");
-                    return null;
-                }
-
-                T instance = (T)Activator.CreateInstance(type);
-                return instance;
-            }
-            
-            return null;
+            return targetInstance;
         }
+        
 
         public void UnregisterAllServices()
         {
-            List<object> activeInstances = new List<object>(typeToInstances.Count);
-            foreach (KeyValuePair<Type, object> typeToInstance in typeToInstances)
+            List<object> activeInstances = new List<object>(serviceTypeToInstances.Count);
+            foreach (KeyValuePair<Type, object> typeToInstance in serviceTypeToInstances)
                 activeInstances.Add(typeToInstance.Value);
 
             for (int i = activeInstances.Count - 1; i >= 0; i--)
@@ -169,14 +210,13 @@ namespace BrunoMikoski.ServicesLocation
                 UnregisterInstance(activeInstances[i]);
             }
             
-            typeToInstances.Clear();
+            serviceTypeToInstances.Clear();
 
-            if (waitingOnDependenciesTobeResolved.Count > 0)
+            if (servicesWaitingOnDependenciesTobeResolved.Count > 0)
             {
-                Debug.LogWarning($"{waitingOnDependenciesTobeResolved.Count} dependencies was waiting to be resolved");
-                waitingOnDependenciesTobeResolved.Clear();
-                waitingDependenciesBeResolvedToRegister.Clear();
-                typeToObservables.Clear();
+                Debug.LogWarning($"{servicesWaitingOnDependenciesTobeResolved.Count} dependencies was waiting to be resolved");
+                servicesWaitingOnDependenciesTobeResolved.Clear();
+                serviceTypeToObservables.Clear();
             }
         }
         
@@ -194,11 +234,11 @@ namespace BrunoMikoski.ServicesLocation
 
         public void UnregisterInstance(Type targetType)
         {
-            if (!typeToInstances.TryGetValue(targetType, out object serviceInstance)) 
+            if (!serviceTypeToInstances.TryGetValue(targetType, out object serviceInstance)) 
                 return;
             
             DispatchOnUnregisteredService(targetType, serviceInstance);
-            typeToInstances.Remove(targetType);
+            serviceTypeToInstances.Remove(targetType);
         }
 
         private void DispatchOnUnregisteredService(Type targetType, object serviceInstance)
@@ -208,7 +248,7 @@ namespace BrunoMikoski.ServicesLocation
                 onServiceUnregistered.OnUnregisteredFromServiceLocator(this);
             }
             
-            if (typeToObservables.TryGetValue(targetType, out List<IServiceObservable> observables))
+            if (serviceTypeToObservables.TryGetValue(targetType, out List<IServiceObservable> observables))
             {
                 for (int i = 0; i < observables.Count; i++)
                     observables[i].OnServiceUnregistered(targetType);
@@ -218,17 +258,17 @@ namespace BrunoMikoski.ServicesLocation
         public void SubscribeToServiceChanges<T>(IServiceObservable observable)
         {
             Type type = typeof(T);
-            if (!typeToObservables.ContainsKey(type))
-                typeToObservables.Add(type, new List<IServiceObservable>());
+            if (!serviceTypeToObservables.ContainsKey(type))
+                serviceTypeToObservables.Add(type, new List<IServiceObservable>());
 
-            if (!typeToObservables[type].Contains(observable))
-                typeToObservables[type].Add(observable);
+            if (!serviceTypeToObservables[type].Contains(observable))
+                serviceTypeToObservables[type].Add(observable);
         }
         
         public void UnsubscribeToServiceChanges<T>(IServiceObservable observable)
         {
             Type type = typeof(T);
-            if (!typeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
+            if (!serviceTypeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
                 return;
 
             observables.Remove(observable);
@@ -236,71 +276,154 @@ namespace BrunoMikoski.ServicesLocation
 
         private void TryResolveDependencies()
         {
-            for (int i = waitingOnDependenciesTobeResolved.Count - 1; i >= 0; i--)
+            bool anyNewServiceRegistered = false;
+            Dictionary<Type, object> resolvedDependencies = new Dictionary<Type, object>();
+            foreach (var typeToInstance in servicesWaitingOnDependenciesTobeResolved)
             {
-                IDependsOnServices dependsOnServices = waitingOnDependenciesTobeResolved[i];
-                if (!IsDependenciesResolved(dependsOnServices)) 
+                if (!IsServiceDependenciesResolved(typeToInstance.Key)) 
                     continue;
-                
-                waitingOnDependenciesTobeResolved.Remove(dependsOnServices);
 
-                if (waitingDependenciesBeResolvedToRegister.ContainsKey(dependsOnServices))
-                {
-                    RegisterInstance(waitingDependenciesBeResolvedToRegister[dependsOnServices], dependsOnServices);
-                    waitingDependenciesBeResolvedToRegister.Remove(dependsOnServices);
-                }
-                
-                dependsOnServices.OnServicesDependenciesResolved();
+                resolvedDependencies.Add(typeToInstance.Key, typeToInstance.Value);
             }
+
+            foreach (var resolvedTypeToObj in resolvedDependencies)
+            {
+                servicesWaitingOnDependenciesTobeResolved.Remove(resolvedTypeToObj.Key);
+                RegisterInstance(resolvedTypeToObj.Key, resolvedTypeToObj.Value, false);
+                anyNewServiceRegistered = true;
+            }
+
+            List<Type>[] items = servicesListToCallback.Keys.ToArray();
+
+            for (int i = 0; i < items.Length; i++)
+            {
+                List<Type> item = items[i];
+                if (!HasAllServices(item))
+                    continue;
+
+                servicesListToCallback[item].Invoke();
+                servicesListToCallback.Remove(item);
+            }
+
+            if (anyNewServiceRegistered)
+                TryResolveDependencies();
         }
 
-        private bool IsDependenciesResolved(IDependsOnServices dependsOnServices)
+        private bool IsServiceDependenciesResolved(Type targetType)
         {
-            if (dependsOnServices is IDependsOnExplicitServices explicitServices)
+            object[] serviceAttributeObjects = targetType.GetCustomAttributes(
+                typeof(ServiceImplementationAttribute), true);
+
+            if (serviceAttributeObjects.Length == 0)
+                return true;
+
+            for (int i = 0; i < serviceAttributeObjects.Length; i++)
             {
-                for (int i = 0; i < explicitServices.DependsOnServices.Length; i++)
+                ServiceImplementationAttribute serviceAttribute =
+                    (ServiceImplementationAttribute) serviceAttributeObjects[i];
+
+                if (serviceAttribute.DependsOn == null || serviceAttribute.DependsOn.Length == 0)
+                    continue;
+
+                for (int j = 0; j < serviceAttribute.DependsOn.Length; j++)
                 {
-                    if (!HasService(explicitServices.DependsOnServices[i]))
+                    Type dependencyType = serviceAttribute.DependsOn[j];
+                    if (!HasService(dependencyType))
                         return false;
                 }
-                return true;
             }
 
-            Type[] dependencies = dependencyCache.GetDependencies(dependsOnServices.GetType());
-            for (int i = 0; i < dependencies.Length; i++)
+            return true;
+        }
+
+        public void Inject(object targetObject, Action callback = null)
+        {
+            if (injectedObjects.Contains(targetObject))
             {
-                if (!HasService(dependencies[i]))
+                Debug.LogWarning($"Trying to inject {targetObject} that was already injected, skipping");
+                return;
+            }
+            
+            bool allResolved = DependenciesUtility.Inject(targetObject);
+            if (allResolved)
+            {
+                injectedObjects.Add(targetObject);
+                return;
+            }
+           
+            if (callback == null)
+            {
+                throw new Exception(
+                    $"{targetObject.GetType().Name} has unresolved dependencies and no callback was provided to handle it");
+            }
+               
+            List<Type> unresolvedDependencies = DependenciesUtility.GetUnresolvedDependencies(targetObject);
+               
+            AddServicesRegisteredCallback(unresolvedDependencies, () =>
+            {
+                DependenciesUtility.Inject(targetObject);
+                callback();
+            });
+        }
+
+#if UNITASK_ENABLED
+
+        public async UniTask InjectAsync(object script, CancellationToken token = default)
+        {
+            bool allResolved = DependenciesUtility.Inject(script);
+            if (allResolved)
+                return;
+            
+            List<Type> unresolvedDependencies = DependenciesUtility.GetUnresolvedDependencies(script);
+
+            if (token == default)
+            {
+                if (script is MonoBehaviour unityObject)
+                    token = unityObject.GetCancellationTokenOnDestroy();
+            }
+
+            List<UniTask> dependenciesTasks = new List<UniTask>();
+
+            for (int i = 0; i < unresolvedDependencies.Count; i++)
+            {
+                Type unresolvedDependency = unresolvedDependencies[i];
+                dependenciesTasks.Add(WaitForServiceAsync(unresolvedDependency, token));
+            }
+
+            await UniTask.WhenAll(dependenciesTasks);
+
+            DependenciesUtility.Inject(script);
+        }
+        
+        
+        public async UniTask WaitForServiceAsync<T>(CancellationToken token = default) where T : class
+        {
+            await WaitForServiceAsync(typeof(T), token);
+        }
+        
+        public async UniTask WaitForServiceAsync(Type targetType, CancellationToken token = default)
+        {
+            await UniTask.WaitUntil(() => HasService(targetType), cancellationToken: token);
+        }
+#endif
+        private void AddServicesRegisteredCallback(List<Type> services, Action callback)
+        {
+            if (HasAllServices(services))
+                callback?.Invoke();
+
+            servicesListToCallback.Add(services, callback);
+        }
+
+        private bool HasAllServices(List<Type> services)
+        {
+            for (int i = 0; i < services.Count; i++)
+            {
+                if (!HasService(services[i]))
                     return false;
             }
 
             return true;
         }
 
-#if UNITASK_ENABLED
-        public async UniTask WaitForServiceAsync<T>() where T : class
-        {
-            await UniTask.WaitUntil(HasService<T>);
-        }
-#endif
-
-        public void ResolveDependencies(IDependsOnExplicitServices serviceDependent)
-        {
-            waitingOnDependenciesTobeResolved.Add(serviceDependent);
-            
-            TryResolveDependencies();
-        }
-
-        public void ResolveDependencies(IDependsOnServices dependsOnService)
-        {
-            Type[] dependencies = dependencyCache.GetDependencies(dependsOnService.GetType());
-            if (dependencies == null)
-            {
-                dependsOnService.OnServicesDependenciesResolved();
-                return;
-            }
-            
-            waitingOnDependenciesTobeResolved.Add(dependsOnService);
-            TryResolveDependencies();
-        }
     }
 }

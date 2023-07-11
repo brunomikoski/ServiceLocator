@@ -16,133 +16,20 @@ namespace BrunoMikoski.ServicesLocation
         private const string GENERATE_AOT_DEPENDENCIES = "Tools/ServiceLocator/Generate AOT Dependencies";
         private const string GENERATE_STATIC_FILE = "Tools/ServiceLocator/Generate Services File";
 
-        private static Dictionary<string, List<ServiceImplementationAttribute>> categoryToAttributesList =
-            new Dictionary<string, List<ServiceImplementationAttribute>>();
+        private static Dictionary<string, List<ServiceImplementationAttribute>> categoryToAttributesList = new();
 
-        private static Dictionary<string, Type> nameToTypeCache = new Dictionary<string, Type>();
-
-        [MenuItem(GENERATE_AOT_DEPENDENCIES)]
-        public static void GenerateAOTDependenciesFile()
-        {
-            TypeCache.TypeCollection types = TypeCache.GetTypesDerivedFrom<IDependsOnServices>();
-
-            DependencyCache dependencyCache = new DependencyCache();
-            for (int i = 0; i < types.Count; i++)
-            {
-                Type type = types[i];
-
-                if (typeof(IDependsOnExplicitServices).IsAssignableFrom(type))
-                    continue;
-                
-
-                HashSet<Type> dependencies = new HashSet<Type>();
-
-                if (ServiceLocatorSettings.GetInstance().SearchForDependencyOnFields)
-                {
-                    MemberInfo[] memberInfos = type.GetMembers(BindingFlags.Instance | BindingFlags.Public |
-                                                               BindingFlags.Static | BindingFlags.NonPublic);
-                    for (int j = 0; j < memberInfos.Length; j++)
-                    {
-                        MemberInfo info = memberInfos[j];
-                        if (info.MemberType != MemberTypes.Field)
-                            continue;
-
-                        FieldInfo fieldInfo = ((FieldInfo) info);
-
-                        if (!fieldInfo.FieldType.IsGenericType)
-                            continue;
-
-                        if (fieldInfo.FieldType.GetGenericTypeDefinition() == typeof(ServiceReference<>))
-                        {
-                            Type fieldType = fieldInfo.FieldType.GetGenericArguments()[0];
-
-                            dependencies.Add(fieldType);
-                        }
-                    }
-                }
-
-
-                if (ServiceLocatorSettings.GetInstance().SearchForDependenciesOnMethods)
-                {
-                    MethodInfo[] methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Public |
-                                                           BindingFlags.Static | BindingFlags.NonPublic);
-
-                    for (int j = 0; j < methods.Length; j++)
-                    {
-                        MethodInfo methodInfo = methods[j];
-                        MethodBody methodBody = methodInfo.GetMethodBody();
-
-                        if (methodBody == null)
-                            continue;
-
-                        for (int k = 0; k < methodBody.LocalVariables.Count; k++)
-                        {
-                            LocalVariableInfo localVariableInfo = methodBody.LocalVariables[k];
-                            if (localVariableInfo == null || localVariableInfo.LocalType == null ||
-                                !localVariableInfo.LocalType.IsGenericType)
-                                continue;
-
-                            if (localVariableInfo.LocalType.GetGenericTypeDefinition() == typeof(ServiceReference<>))
-                            {
-                                Type fieldType = localVariableInfo.LocalType.GetGenericArguments()[0];
-
-                                dependencies.Add(fieldType);
-                            }
-                        }
-                    }
-                }
-
-                if (ServiceLocatorSettings.GetInstance().UseDeepDependencySearch)
-                {
-                    string[] assetGUIDs = AssetDatabase.FindAssets($"t:TextAsset {type.Name}");
-                    if (assetGUIDs.Length == 1)
-                    {
-                        TextAsset textAsset = AssetDatabase.LoadAssetAtPath<TextAsset>(AssetDatabase.GUIDToAssetPath(assetGUIDs[0]));
-
-                        string[] regex = ServiceLocatorSettings.GetInstance().DeepDependencySearchRegex;
-                        for (int j = 0; j < regex.Length; j++)
-                        {
-                            LookForMatches(textAsset, regex[j], ref dependencies);
-                        }
-                    }
-                }
-
-                if (dependencies.Count > 0)
-                {
-                    dependencyCache.Add(type, dependencies);
-                }
-            }
-
-            string json = JsonUtility.ToJson(dependencyCache);
-
-            string assetPath = "Assets/Resources/ServiceLocatorAOTDependencies.json";
-            File.WriteAllText(assetPath, json);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
-        }
+        private static Dictionary<string, Type> nameToTypeCache = new();
         
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ClearStaticReferences()
+        {
+            categoryToAttributesList.Clear();
+            nameToTypeCache.Clear();
+        }
+
         private static int CompareTypes(ServiceImplementationAttribute a, ServiceImplementationAttribute b)
         {
             return string.Compare(a.Name, b.Name, StringComparison.Ordinal);
-        }
-
-        private static void LookForMatches(TextAsset classAsset, string regexSearch, ref HashSet<Type> dependencies)
-        {
-            Regex regex = new Regex(regexSearch, RegexOptions.Compiled);
-            MatchCollection matches = regex.Matches(classAsset.text);
-            for (int i = 0; i < matches.Count; i++)
-            {
-                Match match = matches[i];
-                if (!match.Success)
-                    continue;
-
-                for (int j = 0; j < match.Groups.Count; j++)
-                {
-                    Group matchGroup = match.Groups[j];
-                    if (TryGetServiceByName(matchGroup.Value, out Type dependency))
-                        dependencies.Add(dependency);
-                }
-            }
         }
 
         /// <summary>
@@ -155,15 +42,9 @@ namespace BrunoMikoski.ServicesLocation
             if (Application.isPlaying || !Application.isEditor || Application.isBatchMode)
                 return;
 
-            if (ServiceLocatorSettings.GetInstance().GenerateStaticFileOnScriptReload)
+            if(ServiceLocatorSettings.Instance.GenerateStaticFileOnScriptReload)
             {
                 GenerateServicesClass();
-            }
-
-            if (ServiceLocatorSettings.GetInstance().GenerateAOTDependencyFile &&
-                ServiceLocatorSettings.GetInstance().GenerateAOTDependencyFileOnScriptReload)
-            {
-                GenerateAOTDependenciesFile();
             }
         }
 
@@ -171,7 +52,7 @@ namespace BrunoMikoski.ServicesLocation
         internal static bool GenerateServicesClass()
         {
             categoryToAttributesList.Clear();
-            ServiceLocatorSettings serviceLocatorSettings = ServiceLocatorSettings.GetInstance();
+            ServiceLocatorSettings serviceLocatorSettings = ServiceLocatorSettings.Instance;
             string servicesClassName = serviceLocatorSettings.ServicesFileName;
             string referencesClassName = serviceLocatorSettings.ReferenceClassName;
             string targetScriptFolder = serviceLocatorSettings.GeneratedScriptsFolderPath;
@@ -338,34 +219,6 @@ namespace BrunoMikoski.ServicesLocation
             }
 
             return name.FirstToUpper();
-        }
-
-        private static bool TryGetServiceByName(string nameOfService, out Type resultType)
-        {
-            if (nameToTypeCache.TryGetValue(nameOfService, out resultType))
-                return resultType != null;
-
-            IList<Type> types = AppDomain.CurrentDomain.GetAllTypes(AssembliesType.PlayerWithoutTestAssemblies);
-
-            int matchCount = 0;
-            for (int i = types.Count - 1; i >= 0; i--)
-            {
-                Type availableType = types[i];
-                if (availableType.Name.IndexOf(nameOfService, StringComparison.Ordinal) > -1)
-                {
-                    matchCount++;
-                    resultType = availableType;
-                }
-            }
-
-            if (matchCount == 1)
-            {
-                nameToTypeCache.Add(nameOfService, resultType);
-                return true;
-            }
-
-            nameToTypeCache.Add(nameOfService, null);
-            return false;
         }
     }
 }
