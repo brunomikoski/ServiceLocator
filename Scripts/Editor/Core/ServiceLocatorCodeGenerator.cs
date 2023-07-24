@@ -125,7 +125,7 @@ namespace BrunoMikoski.ServicesLocation
                     {
                         ServiceImplementationAttribute implementation = implementations[i];
                         output.AppendLine(
-                            $"            public static ServiceReference <{implementation.Type.FullName}> {implementation.Name};");
+                            $"            public static ServiceReference <{implementation.Type.FullName}> {implementation.Name} = new ServiceReference <{implementation.Type.FullName}>();");
                     }
 
                     output.AppendLine("        }");
@@ -148,7 +148,7 @@ namespace BrunoMikoski.ServicesLocation
                     {
                         ServiceImplementationAttribute implementation = implementations[i];
                         output.AppendLine(
-                            $"                public static ServiceReference <{implementation.Type.FullName}> {implementation.Name};");
+                            $"                public static ServiceReference <{implementation.Type.FullName}> {implementation.Name} = ServiceReference <{implementation.Type.FullName}>();");
                     }
 
                     output.AppendLine("            }");
