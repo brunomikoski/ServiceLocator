@@ -16,8 +16,11 @@ namespace BrunoMikoski.ServicesLocation
                 if (!hasCachedInstance)
                 {
                     hasCachedInstance = ServiceLocator.Instance.TryGetInstance(out instance);
-                    ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
-                    ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+                    if (hasCachedInstance)
+                    {
+                        ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
+                        ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+                    }
                 }
                 return instance;
             }
