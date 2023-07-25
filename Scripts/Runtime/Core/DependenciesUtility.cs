@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace BrunoMikoski.ServicesLocation
 {
-    public class InjectedMemberData
+    public struct InjectedMemberData
     {
         public object OwnerObject;
         public MemberInfo MemberInfo;
@@ -22,6 +22,7 @@ namespace BrunoMikoski.ServicesLocation
         private const BindingFlags FLAGS = BindingFlags.Default | BindingFlags.Instance | BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic;
 
         private static Dictionary<Type, List<Type>> typeToDependencyListCache = new();
+        private static Dictionary<Type, List<Type>> typeToUnresolvedDependencyListCache = new();
         private static Dictionary<Type, Dictionary<MemberInfo, Type>> typeToFieldToTypeDependencyCache = new();
         private static Dictionary<Type, List<InjectedMemberData>> injectedObjects = new();
 
@@ -30,6 +31,7 @@ namespace BrunoMikoski.ServicesLocation
         {
             typeToDependencyListCache.Clear();
             typeToFieldToTypeDependencyCache.Clear();
+            typeToUnresolvedDependencyListCache.Clear();
             injectedObjects.Clear();
         }
 
@@ -61,8 +63,14 @@ namespace BrunoMikoski.ServicesLocation
 
         internal static List<Type> GetUnresolvedDependencies(object targetObject)
         {
+            Type targetObjectType = targetObject.GetType();
+
+            if (typeToUnresolvedDependencyListCache.TryGetValue(targetObjectType, out List<Type> unresolvedDependencies))
+                return unresolvedDependencies;
+
+            unresolvedDependencies = new List<Type>();
+            
             List<Type> dependencies = GetDependencies(targetObject);
-            List<Type> unresolvedDependencies = new List<Type>();
             for (int i = 0; i < dependencies.Count; i++)
             {
                 Type dependency = dependencies[i];
@@ -88,6 +96,11 @@ namespace BrunoMikoski.ServicesLocation
                     if (!ServiceLocator.Instance.TryGetRawInstance(requiredType, out object service))
                     {
                         allDependenciesResolved = false;
+
+                        if (!typeToUnresolvedDependencyListCache.ContainsKey(type))
+                            typeToUnresolvedDependencyListCache.Add(type, new List<Type>());
+
+                        typeToUnresolvedDependencyListCache[type].Add(requiredType);
                         continue;
                     }
 
@@ -125,6 +138,12 @@ namespace BrunoMikoski.ServicesLocation
                     if (!ServiceLocator.Instance.TryGetRawInstance(serviceType, out object service))
                     {
                         allDependenciesResolved = false;
+                        
+                        if (!typeToUnresolvedDependencyListCache.ContainsKey(type))
+                            typeToUnresolvedDependencyListCache.Add(type, new List<Type>());
+
+                        typeToUnresolvedDependencyListCache[type].Add(serviceType);
+                        
                         continue;
                     }
 
@@ -153,6 +172,10 @@ namespace BrunoMikoski.ServicesLocation
                     if (service == null)
                     {
                         allDependenciesResolved = false;
+                        if (!typeToUnresolvedDependencyListCache.ContainsKey(type))
+                            typeToUnresolvedDependencyListCache.Add(type, new List<Type>());
+
+                        typeToUnresolvedDependencyListCache[type].Add(serviceType);
                         continue;
                     }
 
