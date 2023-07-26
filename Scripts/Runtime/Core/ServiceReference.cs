@@ -15,6 +15,9 @@ namespace BrunoMikoski.ServicesLocation
             {
                 if (!hasCachedInstance)
                 {
+                    if (ServiceLocator.IsQuitting)
+                        return null;
+
                     hasCachedInstance = ServiceLocator.Instance.TryGetInstance(out instance);
                     if (hasCachedInstance)
                     {
@@ -26,8 +29,16 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        public bool Exists => ServiceLocator.Instance.HasService<T>();
-        public T CachedReference => instance;
+        public bool Exists
+        {
+            get
+            {
+                if (ServiceLocator.IsQuitting)
+                    return false;
+                
+                return ServiceLocator.Instance.HasService<T>();
+            }
+        }
 
         public static implicit operator T(ServiceReference<T> serviceReference)
         {
@@ -39,7 +50,7 @@ namespace BrunoMikoski.ServicesLocation
             instance = null;
             hasCachedInstance = false;
         }
-
+        
         void IServiceObservable.OnServiceRegistered(Type targetType)
         {
             if (!ServiceLocator.Instance.TryGetInstance(out T newInstance))
