@@ -13,19 +13,7 @@ namespace BrunoMikoski.ServicesLocation
 {
     public static class ServiceLocatorCodeGenerator
     {
-        private const string GENERATE_AOT_DEPENDENCIES = "Tools/ServiceLocator/Generate AOT Dependencies";
         private const string GENERATE_STATIC_FILE = "Tools/ServiceLocator/Generate Services File";
-
-        private static Dictionary<string, List<ServiceImplementationAttribute>> categoryToAttributesList = new();
-
-        private static Dictionary<string, Type> nameToTypeCache = new();
-        
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ClearStaticReferences()
-        {
-            categoryToAttributesList.Clear();
-            nameToTypeCache.Clear();
-        }
 
         private static int CompareTypes(ServiceImplementationAttribute a, ServiceImplementationAttribute b)
         {
@@ -48,25 +36,15 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        [MenuItem(GENERATE_STATIC_FILE)]
-        internal static bool GenerateServicesClass()
+        internal static Dictionary<string, List<ServiceImplementationAttribute>> GetAvailableServices(bool onlyEnabled = true)
         {
-            categoryToAttributesList.Clear();
-            ServiceLocatorSettings serviceLocatorSettings = ServiceLocatorSettings.Instance;
-            string servicesClassName = serviceLocatorSettings.ServicesFileName;
-            string referencesClassName = serviceLocatorSettings.ReferenceClassName;
-            string targetScriptFolder = serviceLocatorSettings.GeneratedScriptsFolderPath;
-
-
-            if (!Directory.Exists(targetScriptFolder))
-                Directory.CreateDirectory(targetScriptFolder);
-
-            string assetPath = Path.Combine(targetScriptFolder, servicesClassName + ".cs");
+            Dictionary<string, List<ServiceImplementationAttribute>> result = new();
+                
             TypeCache.TypeCollection allServicesTypes =
                 TypeCache.GetTypesWithAttribute<ServiceImplementationAttribute>();
 
             if (allServicesTypes.Count == 0)
-                return false;
+                return result;
 
             for (int i = 0; i < allServicesTypes.Count; i++)
             {
@@ -90,17 +68,40 @@ namespace BrunoMikoski.ServicesLocation
 
                     serviceImplementationAttribute.Name = name;
 
+                    if (onlyEnabled && !ServiceLocatorSettings.Instance.IsServiceEnabled(serviceImplementationAttribute))
+                    {
+                        continue;
+                    }
 
                     string category = "";
                     if (!string.IsNullOrEmpty(serviceImplementationAttribute.Category))
                         category = serviceImplementationAttribute.Category;
 
-                    if (!categoryToAttributesList.ContainsKey(category))
-                        categoryToAttributesList.Add(category, new List<ServiceImplementationAttribute>());
+                    if (!result.ContainsKey(category))
+                        result.Add(category, new List<ServiceImplementationAttribute>());
 
-                    categoryToAttributesList[category].Add(serviceImplementationAttribute);
+                    result[category].Add(serviceImplementationAttribute);
                 }
             }
+
+            return result;
+        }
+
+        [MenuItem(GENERATE_STATIC_FILE)]
+        internal static bool GenerateServicesClass()
+        {
+            ServiceLocatorSettings serviceLocatorSettings = ServiceLocatorSettings.Instance;
+            string servicesClassName = serviceLocatorSettings.ServicesFileName;
+            string referencesClassName = serviceLocatorSettings.ReferenceClassName;
+            string targetScriptFolder = serviceLocatorSettings.GeneratedScriptsFolderPath;
+
+
+            if (!Directory.Exists(targetScriptFolder))
+                Directory.CreateDirectory(targetScriptFolder);
+
+            string assetPath = Path.Combine(targetScriptFolder, servicesClassName + ".cs");
+
+            Dictionary<string, List<ServiceImplementationAttribute>> categoryToAttributesList = GetAvailableServices();
 
             StringBuilder output = new StringBuilder();
 
@@ -116,6 +117,7 @@ namespace BrunoMikoski.ServicesLocation
             {
                 List<ServiceImplementationAttribute> implementations = categoryToList.Value;
                 implementations.Sort(CompareTypes);
+                
 
                 if (string.IsNullOrEmpty(categoryToList.Key))
                 {
@@ -125,7 +127,7 @@ namespace BrunoMikoski.ServicesLocation
                     {
                         ServiceImplementationAttribute implementation = implementations[i];
                         output.AppendLine(
-                            $"            public static ServiceReference <{implementation.Type.FullName}> {implementation.Name};");
+                            $"            public static ServiceReference <{implementation.Type.FullName}> {implementation.Name} = new ServiceReference <{implementation.Type.FullName}>();");
                     }
 
                     output.AppendLine("        }");
@@ -148,7 +150,7 @@ namespace BrunoMikoski.ServicesLocation
                     {
                         ServiceImplementationAttribute implementation = implementations[i];
                         output.AppendLine(
-                            $"                public static ServiceReference <{implementation.Type.FullName}> {implementation.Name};");
+                            $"                public static ServiceReference <{implementation.Type.FullName}> {implementation.Name} = new ServiceReference <{implementation.Type.FullName}>();");
                     }
 
                     output.AppendLine("            }");
