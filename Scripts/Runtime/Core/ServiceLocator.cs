@@ -11,17 +11,31 @@ using Cysharp.Threading.Tasks;
 
 namespace BrunoMikoski.ServicesLocation
 {
-    public class ServiceLocator 
+    public class ServiceLocator
     {
+        private static bool initialized;
         private static ServiceLocator instance;
         public static ServiceLocator Instance
         {
             get
             {
-                if (instance == null)
-                    instance = new ServiceLocator();
+                Initialize();
                 return instance;
             }
+        }
+        
+        internal static bool IsQuitting { get; set; }
+
+        private static void Initialize()
+        {
+            if (initialized)
+                return;
+
+            instance = new ServiceLocator();
+            GameObject serviceLocatorGameObject = new GameObject("ServiceLocator");
+            serviceLocatorGameObject.AddComponent<ServiceLocatorMonoBehaviour>();
+            Object.DontDestroyOnLoad(serviceLocatorGameObject);
+            initialized = true;
         }
 
         private Dictionary<Type, object> serviceTypeToInstances = new();
@@ -423,6 +437,11 @@ namespace BrunoMikoski.ServicesLocation
             }
 
             return true;
+        }
+
+        internal static void SetIsQuitting()
+        {
+            IsQuitting = true;
         }
 
     }
