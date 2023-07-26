@@ -203,19 +203,25 @@ namespace BrunoMikoski.ServicesLocation
 
             string name = serviceImplementationAttribute.Type.Name;
 
-            const string serviceStr = "Service";
-            if (name.EndsWith(serviceStr))
+            if (ServiceLocatorSettings.Instance.StripServiceFromNames)
             {
-                name = name.Substring(0, name.Length - serviceStr.Length);
+                const string serviceStr = "Service";
+                if (name.EndsWith(serviceStr))
+                {
+                    name = name.Substring(0, name.Length - serviceStr.Length);
+                }
             }
 
-            if (serviceImplementationAttribute.Type.IsInterface)
+            if (ServiceLocatorSettings.Instance.StripIFromNames)
             {
-                if (name.StartsWith("I"))
+                if (serviceImplementationAttribute.Type.IsInterface)
                 {
-                    if (char.IsUpper(name[1]))
+                    if (name.StartsWith("I"))
                     {
-                        name = name.Substring(1);
+                        if (char.IsUpper(name[1]))
+                        {
+                            name = name.Substring(1);
+                        }
                     }
                 }
             }

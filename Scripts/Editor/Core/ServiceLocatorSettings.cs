@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace BrunoMikoski.ServicesLocation
 {
@@ -29,17 +30,27 @@ namespace BrunoMikoski.ServicesLocation
                         EditorGUILayout.BeginVertical("Box");
                         EditorGUILayout.LabelField("Static Access File", EditorStyles.boldLabel);
                         EditorGUILayout.Space();
+                        EditorGUI.indentLevel++;
 
                         DefaultAsset newFolder = EditorGUILayout.ObjectField("Default Scripts Folder", SCRIPTS_FOLDER, typeof(DefaultAsset), false) as DefaultAsset;
 
                         
                         settings.ServicesFileName = EditorGUILayout.TextField("Services FileName", settings.ServicesFileName);
                         settings.ReferenceClassName = EditorGUILayout.TextField("Reference Class Name", settings.ReferenceClassName);
-                        settings.GenerateStaticFileOnScriptReload = EditorGUILayout.Toggle("Generate Static File On Script Reload", settings.GenerateStaticFileOnScriptReload);
+                        settings.GenerateStaticFileOnScriptReload = EditorGUILayout.Toggle("Auto Generate", settings.GenerateStaticFileOnScriptReload);
+                        EditorGUI.indentLevel--;
+
+                        EditorGUILayout.LabelField("Services Names", EditorStyles.boldLabel);
+                        EditorGUILayout.Space();
+                        EditorGUI.indentLevel++;
+                        settings.StripServiceFromNames = EditorGUILayout.Toggle("Strip 'Service'", settings.StripServiceFromNames);
+                        settings.StripIFromNames = EditorGUILayout.Toggle("Strip 'I'", settings.StripIFromNames);
+                        EditorGUI.indentLevel--;
 
                         if (changeCheck.changed)
                         {
                             settings.GeneratedScriptsFolderPath = AssetDatabase.GetAssetPath(newFolder);
+                            ServiceLocatorServicesTable.Reload();
                             settings.Save();
                         }
                         
@@ -143,6 +154,23 @@ namespace BrunoMikoski.ServicesLocation
         [SerializeField]
         private List<string> ignoredServicesWhenGenerating = new();
 
+        
+        [SerializeField] 
+        private bool stripServiceFromNames = true;
+        public bool StripServiceFromNames
+        {
+            get => stripServiceFromNames;
+            set => stripServiceFromNames = value;
+        }
+        
+        [SerializeField] 
+        private bool stripIFromNames = true;
+        public bool StripIFromNames
+        {
+            get => stripIFromNames;
+            set => stripIFromNames = value;
+        }
+        
 
         public void Save()
         {
@@ -152,23 +180,23 @@ namespace BrunoMikoski.ServicesLocation
 
         public bool IsServiceEnabled(ServiceImplementationAttribute serviceAttribute)
         {
-            return ignoredServicesWhenGenerating.Contains(serviceAttribute.Name);
+            return ignoredServicesWhenGenerating.Contains(serviceAttribute.Type.FullName);
         }
 
         public void SetServiceEnabled(ServiceImplementationAttribute serviceAttribute, bool value)
         {
             if (value)
             {
-                if (!ignoredServicesWhenGenerating.Contains(serviceAttribute.Name))
-                {
-                    ignoredServicesWhenGenerating.Add(serviceAttribute.Name);
+                if (ignoredServicesWhenGenerating.Remove(serviceAttribute.Type.FullName))
                     Save();
-                }
             }
             else
             {
-                if (ignoredServicesWhenGenerating.Remove(serviceAttribute.Name))
+                if (!ignoredServicesWhenGenerating.Contains(serviceAttribute.Type.FullName))
+                {
+                    ignoredServicesWhenGenerating.Add(serviceAttribute.Type.FullName);
                     Save();
+                }
             }
         }
     }

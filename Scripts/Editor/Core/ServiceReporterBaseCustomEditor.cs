@@ -13,12 +13,12 @@ namespace BrunoMikoski.ServicesLocation
             GUILayout.Space(20);
 
             EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("Services File Options", EditorStyles.toolbarButton))
+            if (GUILayout.Button("Options", EditorStyles.miniButtonLeft))
             {
                 ServiceLocatorSettings.Show();
             }
 
-            if (GUILayout.Button("Generate Static Services File", EditorStyles.toolbarButton))
+            if (GUILayout.Button("Generate Static Services File", EditorStyles.miniButtonRight))
             {
                 ServiceLocatorCodeGenerator.GenerateServicesClass();
             }

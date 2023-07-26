@@ -213,7 +213,7 @@ namespace BrunoMikoski.ServicesLocation
         private static AvailableServiceTreeView TREE_VIEW;
         private static GUIStyle TABLE_LIST_STYLE;
         private static Vector2 TABLE_SCROLL;
-        private static readonly GUIContent ReloadHeadContent = EditorGUIUtility.TrTextContent("Generate", "Generate Services File");
+        private static readonly GUIContent GenerateContent = EditorGUIUtility.TrTextContent("Generate", "Generate Services File");
 
         public static void DrawGeneratorWindow()
         {
@@ -222,6 +222,24 @@ namespace BrunoMikoski.ServicesLocation
 
             // Column Tabble
             RenderTable();
+            
+            RenderBottomPanel();
+
+        }
+
+        private static void RenderBottomPanel()
+        {
+            EditorGUILayout.BeginVertical(EMPTY_LAYOUT_OPTION);
+            EditorGUILayout.BeginHorizontal(EditorStyles.toolbar, EMPTY_LAYOUT_OPTION);
+
+            if (GUILayout.Button(GenerateContent))
+            {
+                ServiceLocatorCodeGenerator.GenerateServicesClass();
+            }
+            
+
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
         }
 
         static void RenderHeadPanel()
@@ -229,11 +247,6 @@ namespace BrunoMikoski.ServicesLocation
             EditorGUILayout.BeginVertical(EMPTY_LAYOUT_OPTION);
             EditorGUILayout.BeginHorizontal(EditorStyles.toolbar, EMPTY_LAYOUT_OPTION);
 
-            if (GUILayout.Button(ReloadHeadContent, EditorStyles.toolbarButton, EMPTY_LAYOUT_OPTION))
-            {
-                ServiceLocatorCodeGenerator.GenerateServicesClass();
-            }
-            
             GUILayout.FlexibleSpace();
 
             EditorGUILayout.EndHorizontal();
@@ -262,6 +275,11 @@ namespace BrunoMikoski.ServicesLocation
 
             EditorGUILayout.EndScrollView();
             EditorGUILayout.EndVertical();
+        }
+
+        public static void Reload()
+        {
+            TREE_VIEW.ReloadAndSort();
         }
     }
 }
