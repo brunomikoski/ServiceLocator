@@ -49,6 +49,7 @@ namespace BrunoMikoski.ServicesLocation
         private HashSet<object> injectedObjects = new();
 
         private HashSet<Type> servicesTypeRegisteredOnce = new();
+        
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         static void ClearStaticReferences()
@@ -211,7 +212,6 @@ namespace BrunoMikoski.ServicesLocation
             }
             return targetInstance;
         }
-        
 
         public void UnregisterAllServices()
         {

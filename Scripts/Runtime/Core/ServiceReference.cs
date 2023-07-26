@@ -1,22 +1,26 @@
 ﻿using System;
-using Object = System.Object;
 #if UNITASK_ENABLED
 using Cysharp.Threading.Tasks;
 #endif
 
 namespace BrunoMikoski.ServicesLocation
 {
-    public struct ServiceReference<T> : IServiceObservable where T : class
+    public class ServiceReference<T> : IServiceObservable where T : class
     {
+        private bool hasCachedInstance;
         private T instance;
         public T Reference
         {
             get
             {
-                if (IsNullOrDestroyed(instance))
+                if (!hasCachedInstance)
                 {
-                    if (ServiceLocator.Instance.TryGetInstance(out instance))
+                    hasCachedInstance = ServiceLocator.Instance.TryGetInstance(out instance);
+                    if (hasCachedInstance)
+                    {
+                        ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
                         ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+                    }
                 }
                 return instance;
             }
@@ -24,17 +28,6 @@ namespace BrunoMikoski.ServicesLocation
 
         public bool Exists => ServiceLocator.Instance.HasService<T>();
         public T CachedReference => instance;
-
-        private bool IsNullOrDestroyed(Object obj) {
- 
-            if (ReferenceEquals(obj, null)) 
-                return true;
- 
-            if (obj is UnityEngine.Object o) 
-                return o == null;
- 
-            return false;
-        }
 
         public static implicit operator T(ServiceReference<T> serviceReference)
         {
@@ -44,6 +37,7 @@ namespace BrunoMikoski.ServicesLocation
         public void ClearCache()
         {
             instance = null;
+            hasCachedInstance = false;
         }
 
         void IServiceObservable.OnServiceRegistered(Type targetType)
@@ -53,10 +47,11 @@ namespace BrunoMikoski.ServicesLocation
             
             if (Equals(newInstance, instance))
                 return;
-
+        
             instance = newInstance;
+            hasCachedInstance = true;
         }
-
+        
         void IServiceObservable.OnServiceUnregistered(Type targetType)
         {
             ClearCache();
