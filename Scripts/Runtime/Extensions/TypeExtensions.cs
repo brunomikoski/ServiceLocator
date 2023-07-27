@@ -21,7 +21,7 @@ namespace BrunoMikoski.ServicesLocation
         public static MethodInfo GetInstanceMethod(this Type type, string name, Type[] parameters)
         {
             return type.GetInstanceMethods()
-                .FirstOrDefault(mi => mi.Name == name && mi.GetParameters().HasTypes(parameters));
+                .FirstOrDefault(mi => string.Equals(mi.Name, name, StringComparison.Ordinal) && mi.GetParameters().HasTypes(parameters));
         }
         
         public static bool HasTypes(this ParameterInfo[] parameters, Type[] types)

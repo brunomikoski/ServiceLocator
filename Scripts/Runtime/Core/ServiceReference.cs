@@ -9,6 +9,8 @@ namespace BrunoMikoski.ServicesLocation
 {
     public class ServiceReference<T> : IServiceObservable where T : class
     {
+        private int lastFrameCheckedForNativeAlive;
+
         private bool hasCachedInstance;
         private T instance;
         public T Reference
@@ -31,6 +33,10 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
+        /// <summary>
+        /// This method will check if the service exist, and if its a Object if its not pending to be destroyed.
+        /// Its expensive so don't use it on a Update loop
+        /// </summary>
         public bool Exists
         {
             get
@@ -55,8 +61,12 @@ namespace BrunoMikoski.ServicesLocation
                 if ((obj as UnityEngine.Object) == null) 
                     return true;
 
-                if (!unityObj.IsNativeObjectAlive())
-                    return true;
+                if (lastFrameCheckedForNativeAlive != Time.frameCount)
+                {
+                    lastFrameCheckedForNativeAlive = Time.frameCount;
+                    if (!unityObj.IsNativeObjectAlive())
+                        return true;
+                }
             }
 
             return false;
