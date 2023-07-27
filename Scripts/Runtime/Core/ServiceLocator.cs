@@ -11,83 +11,61 @@ using Cysharp.Threading.Tasks;
 
 namespace BrunoMikoski.ServicesLocation
 {
-    public class ServiceLocator
+    public class ServiceLocator : SingletonMonoBehaviour<ServiceLocator>
     {
-        private static bool initialized;
-        private static ServiceLocator instance;
-        public static ServiceLocator Instance
-        {
-            get
-            {
-                Initialize();
-                return instance;
-            }
-        }
+        internal static bool IsQuitting { get; private set; }
+
+        private readonly Dictionary<Type, object> serviceTypeToInstances = new();
+
+        private readonly Dictionary<Type, List<IServiceObservable>> serviceTypeToObservables = new();
+
+        private readonly Dictionary<Type, object> servicesWaitingOnDependenciesTobeResolved = new();
         
-        internal static bool IsQuitting { get; set; }
-
-        private static void Initialize()
-        {
-            if (initialized)
-                return;
-
-            instance = new ServiceLocator();
-            GameObject serviceLocatorGameObject = new GameObject("ServiceLocator");
-            serviceLocatorGameObject.AddComponent<ServiceLocatorMonoBehaviour>();
-            Object.DontDestroyOnLoad(serviceLocatorGameObject);
-            initialized = true;
-        }
-
-        private Dictionary<Type, object> serviceTypeToInstances = new();
-
-        private Dictionary<Type, List<IServiceObservable>> serviceTypeToObservables = new();
-
-        private Dictionary<Type, object> servicesWaitingOnDependenciesTobeResolved = new();
+        private readonly Dictionary<List<Type>, Action> servicesListToCallback = new();
         
-        private Dictionary<List<Type>, Action> servicesListToCallback = new();
-        
-        private HashSet<object> injectedObjects = new();
+        private readonly HashSet<object> injectedObjects = new();
 
-        private HashSet<Type> servicesTypeRegisteredOnce = new();
+        private readonly HashSet<Type> servicesTypeRegisteredOnce = new();
         
-
+        
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ClearStaticReferences()
+        private static void Init()
         {
-            instance = null;
+            IsQuitting = false;
         }
         
-        public void RegisterInstance<T>(T instance)
+        public void RegisterInstance<T>(T serviceInstance)
         {
             Type type = typeof(T);
-            RegisterInstance(type, instance);
+            RegisterInstance(type, serviceInstance);
         }
 
-        private void RegisterInstance(Type type, object instance, bool tryResolveDependencies = true)
+        private void RegisterInstance(Type type, object serviceInstance, bool tryResolveDependencies = true)
         {
-            if (!CanRegisterService(type, instance))
+            if (!CanRegisterService(type, serviceInstance))
                 return;
 
             if (!IsServiceDependenciesResolved(type))
             {
-                servicesWaitingOnDependenciesTobeResolved.Add(type, instance);
+                servicesWaitingOnDependenciesTobeResolved.Add(type, serviceInstance);
                 return;
             }
             
-            serviceTypeToInstances.Add(type, instance);
-            DispatchOnRegistered(type, instance);
+            serviceTypeToInstances.Add(type, serviceInstance);
+            
+            DispatchOnRegistered(type, serviceInstance);
             if (tryResolveDependencies)
                 TryResolveDependencies();
 
             if (servicesTypeRegisteredOnce.Contains(type))
-                DependenciesUtility.RefreshInjectedMembers(type, instance);
+                DependenciesUtility.RefreshInjectedMembers(type, serviceInstance);
 
             servicesTypeRegisteredOnce.Add(type);
         }
 
-        private void DispatchOnRegistered(Type type, object instance)
+        private void DispatchOnRegistered(Type type, object serviceInstance)
         {
-            if (instance is IOnServiceRegistered onRegistered)
+            if (serviceInstance is IOnServiceRegistered onRegistered)
                 onRegistered.OnRegisteredOnServiceLocator(this);
 
             if (serviceTypeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
@@ -97,7 +75,7 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        private bool CanRegisterService(Type type, object instance)
+        private bool CanRegisterService(Type type, object serviceInstance)
         {
             if (HasService(type))
             {
@@ -105,7 +83,7 @@ namespace BrunoMikoski.ServicesLocation
                 return false;
             }
 
-            if (instance is IConditionalService conditionalService)
+            if (serviceInstance is IConditionalService conditionalService)
             {
                 if (!conditionalService.CanBeRegistered(this))
                     return false;
@@ -239,7 +217,7 @@ namespace BrunoMikoski.ServicesLocation
             Type type = typeof(T);
             UnregisterInstance(type);
         }
-        
+
         public void UnregisterInstance<T>(T instance)
         {
             Type type = instance.GetType();
@@ -439,10 +417,10 @@ namespace BrunoMikoski.ServicesLocation
             return true;
         }
 
-        internal static void SetIsQuitting()
+
+        private void OnApplicationQuit()
         {
             IsQuitting = true;
         }
-
     }
 }

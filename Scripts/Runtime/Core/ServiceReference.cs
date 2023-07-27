@@ -1,4 +1,6 @@
 ﻿using System;
+using UnityEngine;
+using Object = System.Object;
 #if UNITASK_ENABLED
 using Cysharp.Threading.Tasks;
 #endif
@@ -35,9 +37,29 @@ namespace BrunoMikoski.ServicesLocation
             {
                 if (ServiceLocator.IsQuitting)
                     return false;
-                
+
+                if (hasCachedInstance)
+                    return !IsNullOrDestroyed(instance);
+ 
                 return ServiceLocator.Instance.HasService<T>();
             }
+        }
+
+        private bool IsNullOrDestroyed(System.Object obj)
+        {
+            if (object.ReferenceEquals(obj, null)) 
+                return true;
+           
+            if(obj is UnityEngine.Object unityObj)
+            {
+                if ((obj as UnityEngine.Object) == null) 
+                    return true;
+
+                if (!unityObj.IsNativeObjectAlive())
+                    return true;
+            }
+
+            return false;
         }
 
         public static implicit operator T(ServiceReference<T> serviceReference)
