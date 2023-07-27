@@ -24,6 +24,19 @@ namespace BrunoMikoski.ServicesLocation
 
         }
 
+
+        private string cachedAssemblyName;
+        public string AssemblyName
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(cachedAssemblyName))
+                    cachedAssemblyName = ServiceAttribute.Type.Assembly.GetName().Name;
+
+                return cachedAssemblyName;
+            }
+        }
+
         public string GetDependencies()
         {
             if (string.IsNullOrEmpty(cachedDisplayDependencies))
@@ -56,6 +69,7 @@ namespace BrunoMikoski.ServicesLocation
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Name"), width = 10},
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Implementation Type"), width = 10},
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Dependencies"), width = 20},
+                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Assembly"), width = 10},
             })))
         {
         }
@@ -116,6 +130,11 @@ namespace BrunoMikoski.ServicesLocation
                 case 4:
                 {
                     orderedEnumerable = ascending ? items.OrderBy(item => item.GetDependencies().Length) : items.OrderByDescending(item => item.GetDependencies().Length);
+                    break;
+                }
+                case 5:
+                {
+                    orderedEnumerable = ascending ? items.OrderBy(item => item.AssemblyName) : items.OrderByDescending(item => item.AssemblyName);
                     break;
                 }
                 default:
@@ -197,6 +216,11 @@ namespace BrunoMikoski.ServicesLocation
                     case 4:
                     {
                         EditorGUI.LabelField(rect, item.GetDependencies(), labelStyle);
+                        break;
+                    }
+                    case 5:
+                    {
+                        EditorGUI.LabelField(rect, item.AssemblyName, labelStyle);
                         break;
                     }
                     default:

@@ -179,12 +179,12 @@ namespace BrunoMikoski.ServicesLocation
 
         public bool IsServiceEnabled(ServiceImplementationAttribute serviceAttribute)
         {
-            return ignoredServicesWhenGenerating.Contains(serviceAttribute.Type.FullName);
+            return !ignoredServicesWhenGenerating.Contains(serviceAttribute.Type.FullName);
         }
 
-        public void SetServiceEnabled(ServiceImplementationAttribute serviceAttribute, bool value)
+        public void SetServiceEnabled(ServiceImplementationAttribute serviceAttribute, bool isEnabled)
         {
-            if (value)
+            if (isEnabled)
             {
                 if (ignoredServicesWhenGenerating.Remove(serviceAttribute.Type.FullName))
                     Save();

@@ -68,7 +68,7 @@ namespace BrunoMikoski.ServicesLocation
 
                     serviceImplementationAttribute.Name = name;
 
-                    if (onlyEnabled && !ServiceLocatorSettings.Instance.IsServiceEnabled(serviceImplementationAttribute))
+                    if (onlyEnabled && ServiceLocatorSettings.Instance.IsServiceEnabled(serviceImplementationAttribute))
                     {
                         continue;
                     }
