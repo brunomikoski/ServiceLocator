@@ -31,7 +31,7 @@ namespace BrunoMikoski.ServicesLocation
                     nameToMethodInfoCache.Add(key, method);
                 }
 
-                return (T)method?.Invoke(obj, list);
+                return (T)method.Invoke(obj, list);
             }
             catch
             {
