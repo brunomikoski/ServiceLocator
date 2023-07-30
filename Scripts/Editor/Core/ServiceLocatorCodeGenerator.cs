@@ -56,35 +56,42 @@ namespace BrunoMikoski.ServicesLocation
                 {
                     ServiceImplementationAttribute serviceImplementationAttribute =
                         (ServiceImplementationAttribute) customAttributes[j];
-                    if (serviceImplementationAttribute.Type == null)
-                        serviceImplementationAttribute.Type = servicesType;
 
-                    string name = "";
-
-                    if (string.IsNullOrEmpty(serviceImplementationAttribute.Name))
-                        name = GetName(serviceImplementationAttribute);
-                    else
-                        name = serviceImplementationAttribute.Name;
-
-                    serviceImplementationAttribute.Name = name;
+                    UpdateServiceImplementationAttribute(serviceImplementationAttribute, servicesType);
 
                     if (onlyEnabled && !ServiceLocatorSettings.Instance.IsServiceEnabled(serviceImplementationAttribute))
-                    {
                         continue;
-                    }
 
-                    string category = "";
-                    if (!string.IsNullOrEmpty(serviceImplementationAttribute.Category))
-                        category = serviceImplementationAttribute.Category;
+                    if (!result.ContainsKey(serviceImplementationAttribute.Category))
+                        result.Add(serviceImplementationAttribute.Category, new List<ServiceImplementationAttribute>());
 
-                    if (!result.ContainsKey(category))
-                        result.Add(category, new List<ServiceImplementationAttribute>());
+                    if (onlyEnabled && !ServiceLocatorSettings.Instance.IsServiceEnabled(serviceImplementationAttribute))
+                        continue;
 
-                    result[category].Add(serviceImplementationAttribute);
+                    result[serviceImplementationAttribute.Category].Add(serviceImplementationAttribute);
                 }
             }
 
             return result;
+        }
+
+        internal static void UpdateServiceImplementationAttribute(
+            ServiceImplementationAttribute serviceImplementationAttribute, Type servicesType)
+        {
+            if (serviceImplementationAttribute.Type == null)
+                serviceImplementationAttribute.Type = servicesType;
+
+            string name = "";
+
+            if (string.IsNullOrEmpty(serviceImplementationAttribute.Name))
+                name = GetName(serviceImplementationAttribute);
+            else
+                name = serviceImplementationAttribute.Name;
+
+            serviceImplementationAttribute.Name = name;
+
+            if (serviceImplementationAttribute.Category == null)
+                serviceImplementationAttribute.Category = "";
         }
 
         [MenuItem(GENERATE_STATIC_FILE)]

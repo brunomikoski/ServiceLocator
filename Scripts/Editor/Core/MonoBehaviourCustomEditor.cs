@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEditor;
@@ -6,15 +7,19 @@ using UnityEditor;
 namespace BrunoMikoski.ServicesLocation
 {
     [CustomEditor(typeof(MonoBehaviour), true)]
-    public class MonoBehaviourServiceInspector : Editor
+    public class MonoBehaviourCustomEditor : Editor
     {
-        private bool displayHelper;
+        private static Dictionary<Type, string> typeToDisplayInfo = new();
 
-        private StringBuilder displayString = new StringBuilder("");
+        private string displayString;
 
-        private void OnEnable()
+        public void OnEnable()
         {
             Type type = target.GetType();
+
+            if (typeToDisplayInfo.TryGetValue(type, out displayString)) 
+                return;
+            
             object[] customAttributes = type.GetCustomAttributes(typeof(ServiceImplementationAttribute), false);
             if (type.IsValueType || type.IsEnum || customAttributes.Length == 0)
                 return;
@@ -22,8 +27,8 @@ namespace BrunoMikoski.ServicesLocation
             for (int i = 0; i < customAttributes.Length; i++)
             {
                 ServiceImplementationAttribute serviceImplementationAttribute = (ServiceImplementationAttribute)customAttributes[i];
-                if (serviceImplementationAttribute.Type == null)
-                    serviceImplementationAttribute.Type = type;
+                
+                ServiceLocatorCodeGenerator.UpdateServiceImplementationAttribute(serviceImplementationAttribute, type);
                 
                 string displayName = "";
                     
@@ -31,27 +36,22 @@ namespace BrunoMikoski.ServicesLocation
                     displayName = ServiceLocatorCodeGenerator.GetName(serviceImplementationAttribute);
                 else
                     displayName = serviceImplementationAttribute.Name;
-
-                serviceImplementationAttribute.Name = displayName;
                 
-                string category = "";
-                if (!string.IsNullOrEmpty(serviceImplementationAttribute.Category))
-                    category = $"{serviceImplementationAttribute.Category}.";
-
-                displayString.Append($"Accessible by Services.{category}{displayName}");
-                displayHelper = true;
+                displayString = $"Accessible by Services.{serviceImplementationAttribute.Category}{displayName}";
+                typeToDisplayInfo.Add(type, displayString);
             }
         }
 
         public override void OnInspectorGUI()
         {
             base.OnInspectorGUI();
-            if (!displayHelper)
+            
+            if(string.IsNullOrEmpty(displayString))
                 return;
 
             EditorGUILayout.Space();
             EditorGUILayout.Separator();
-            EditorGUILayout.HelpBox(displayString.ToString(), MessageType.Info);
+            EditorGUILayout.HelpBox(displayString, MessageType.Info);
         }
     }
 }
