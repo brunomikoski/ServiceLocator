@@ -1,6 +1,5 @@
 ﻿using System;
 using UnityEngine;
-using Object = System.Object;
 #if UNITASK_ENABLED
 using Cysharp.Threading.Tasks;
 #endif
@@ -44,10 +43,10 @@ namespace BrunoMikoski.ServicesLocation
                 if (ServiceLocator.IsQuitting)
                     return false;
 
-                if (hasCachedInstance)
+                if (hasCachedInstance && ServiceLocator.Instance.HasService<T>())
                     return !IsNullOrDestroyed(instance);
  
-                return ServiceLocator.Instance.HasService<T>();
+                return false;
             }
         }
 
