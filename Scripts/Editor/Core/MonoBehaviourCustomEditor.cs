@@ -36,8 +36,12 @@ namespace BrunoMikoski.ServicesLocation
                     displayName = ServiceLocatorCodeGenerator.GetName(serviceImplementationAttribute);
                 else
                     displayName = serviceImplementationAttribute.Name;
+
+                if (string.IsNullOrEmpty(serviceImplementationAttribute.Category))
+                    displayString = $"Accessible by Services.{displayName}";
+                else
+                    displayString = $"Accessible by Services.{serviceImplementationAttribute.Category}.{displayName}";
                 
-                displayString = $"Accessible by Services.{serviceImplementationAttribute.Category}{displayName}";
                 typeToDisplayInfo.Add(type, displayString);
             }
         }
