@@ -46,7 +46,7 @@ namespace BrunoMikoski.ServicesLocation
                 if (hasCachedInstance && ServiceLocator.Instance.HasService<T>())
                     return !IsNullOrDestroyed(instance);
  
-                return false;
+                return ServiceLocator.Instance.HasService<T>();
             }
         }
 
