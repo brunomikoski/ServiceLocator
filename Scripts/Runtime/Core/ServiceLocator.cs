@@ -37,10 +37,15 @@ namespace BrunoMikoski.ServicesLocation
         public void RegisterInstance<T>(T serviceInstance)
         {
             Type type = typeof(T);
-            RegisterInstance(type, serviceInstance);
+            RegisterInstanceInternal(type, serviceInstance);
         }
 
-        private void RegisterInstance(Type type, object serviceInstance, bool tryResolveDependencies = true)
+        public void RegisterInstance(Type type, object serviceInstance)
+        {
+            RegisterInstanceInternal(type, serviceInstance);
+        } 
+
+        private void RegisterInstanceInternal(Type type, object serviceInstance, bool tryResolveDependencies = true)
         {
             if (!CanRegisterService(type, serviceInstance))
                 return;
@@ -281,7 +286,7 @@ namespace BrunoMikoski.ServicesLocation
             foreach (var resolvedTypeToObj in resolvedDependencies)
             {
                 servicesWaitingOnDependenciesTobeResolved.Remove(resolvedTypeToObj.Key);
-                RegisterInstance(resolvedTypeToObj.Key, resolvedTypeToObj.Value, false);
+                RegisterInstanceInternal(resolvedTypeToObj.Key, resolvedTypeToObj.Value, false);
                 anyNewServiceRegistered = true;
             }
 
