@@ -44,7 +44,9 @@ namespace BrunoMikoski.ServicesLocation
                     return false;
 
                 if (hasCachedInstance && ServiceLocator.Instance.HasService<T>())
-                    return !IsNullOrDestroyed(instance);
+                {
+                    return instance != null && !instance.Equals(null);
+                }
  
                 return ServiceLocator.Instance.HasService<T>();
             }
@@ -52,7 +54,7 @@ namespace BrunoMikoski.ServicesLocation
 
         private bool IsNullOrDestroyed(System.Object obj)
         {
-            if (object.ReferenceEquals(obj, null)) 
+            if (ReferenceEquals(obj, null)) 
                 return true;
            
             if(obj is UnityEngine.Object unityObj)
@@ -63,8 +65,7 @@ namespace BrunoMikoski.ServicesLocation
                 if (lastFrameCheckedForNativeAlive != Time.frameCount)
                 {
                     lastFrameCheckedForNativeAlive = Time.frameCount;
-                    if (!unityObj.IsNativeObjectAlive())
-                        return true;
+                    return !unityObj.IsNativeObjectAlive();
                 }
             }
 
