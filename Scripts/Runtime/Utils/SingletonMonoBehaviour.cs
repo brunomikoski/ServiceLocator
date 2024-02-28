@@ -1,15 +1,19 @@
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace BrunoMikoski.ServicesLocation
 {
+    [Preserve]
     public abstract class SingletonMonoBehaviour<T> : MonoBehaviour where T : Component
     {
+#if UNITY_EDITOR
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Init()
         {
             instance = null;
             hasInstance = false;
         }
+#endif
 
         private static bool hasInstance;
         private static T instance;

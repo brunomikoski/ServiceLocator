@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Scripting;
 using Object = UnityEngine.Object;
 #if UNITASK_ENABLED
 using System.Threading;
@@ -11,6 +12,7 @@ using Cysharp.Threading.Tasks;
 
 namespace BrunoMikoski.ServicesLocation
 {
+    [Preserve]
     public class ServiceLocator : SingletonMonoBehaviour<ServiceLocator>
     {
         internal static bool IsQuitting { get; private set; }
@@ -28,7 +30,7 @@ namespace BrunoMikoski.ServicesLocation
         private readonly HashSet<Type> servicesTypeRegisteredOnce = new();
         
         
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void Init()
         {
             IsQuitting = false;
