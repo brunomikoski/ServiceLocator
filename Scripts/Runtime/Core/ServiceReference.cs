@@ -10,25 +10,25 @@ namespace BrunoMikoski.ServicesLocation
     {
         private int lastFrameCheckedForNativeAlive;
 
-        private bool hasCachedInstance;
-        private T instance;
+        private bool hasCachedReference;
+        private T reference;
         public T Reference
         {
             get
             {
-                if (!hasCachedInstance)
+                if (!hasCachedReference)
                 {
                     if (ServiceLocator.IsQuitting)
                         return null;
 
-                    hasCachedInstance = ServiceLocator.Instance.TryGetInstance(out instance);
-                    if (hasCachedInstance)
+                    hasCachedReference = ServiceLocator.Instance.TryGetInstance(out reference);
+                    if (hasCachedReference)
                     {
                         ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
                         ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
                     }
                 }
-                return instance;
+                return reference;
             }
         }
 
@@ -42,25 +42,31 @@ namespace BrunoMikoski.ServicesLocation
             {
                 if (ServiceLocator.IsQuitting)
                     return false;
-
-                if (hasCachedInstance && ServiceLocator.Instance.HasService<T>())
+                
+                if (ServiceLocator.Instance.HasService<T>())
                 {
-                    return instance != null && !instance.Equals(null);
+                    return HasValidCachedReference();
                 }
- 
-                return ServiceLocator.Instance.HasService<T>();
+
+                return false;
             }
         }
 
-        private bool IsNullOrDestroyed(System.Object obj)
+        public bool HasValidCachedReference()
         {
-            if (ReferenceEquals(obj, null)) 
-                return true;
-           
-            if(obj is UnityEngine.Object unityObj)
+            if (!hasCachedReference)
+                return false;
+
+            if (reference == null)
+                return false;
+
+            if (ReferenceEquals(reference, null))
+                return false;
+
+            if (reference is UnityEngine.Object unityObj)
             {
-                if ((obj as UnityEngine.Object) == null) 
-                    return true;
+                if ((reference as UnityEngine.Object) == null)
+                    return false;
 
                 if (lastFrameCheckedForNativeAlive != Time.frameCount)
                 {
@@ -69,7 +75,7 @@ namespace BrunoMikoski.ServicesLocation
                 }
             }
 
-            return false;
+            return true;
         }
 
         public static implicit operator T(ServiceReference<T> serviceReference)
@@ -79,20 +85,20 @@ namespace BrunoMikoski.ServicesLocation
 
         public void ClearCache()
         {
-            instance = null;
-            hasCachedInstance = false;
+            reference = null;
+            hasCachedReference = false;
         }
         
         void IServiceObservable.OnServiceRegistered(Type targetType)
         {
-            if (!ServiceLocator.Instance.TryGetInstance(out T newInstance))
+            if (!ServiceLocator.Instance.TryGetInstance(out T newReference))
                 return;
             
-            if (Equals(newInstance, instance))
+            if (Equals(newReference, reference))
                 return;
         
-            instance = newInstance;
-            hasCachedInstance = true;
+            reference = newReference;
+            hasCachedReference = true;
         }
         
         void IServiceObservable.OnServiceUnregistered(Type targetType)
