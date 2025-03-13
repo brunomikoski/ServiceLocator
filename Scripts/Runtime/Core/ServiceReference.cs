@@ -42,25 +42,31 @@ namespace BrunoMikoski.ServicesLocation
             {
                 if (ServiceLocator.IsQuitting)
                     return false;
-
-                if (hasCachedReference && ServiceLocator.Instance.HasService<T>())
+                
+                if (ServiceLocator.Instance.HasService<T>())
                 {
-                    return reference != null && !reference.Equals(null);
+                    return HasValidCachedReference();
                 }
- 
-                return ServiceLocator.Instance.HasService<T>();
+
+                return false;
             }
         }
 
-        private bool IsNullOrDestroyed(System.Object obj)
+        public bool HasValidCachedReference()
         {
-            if (ReferenceEquals(obj, null)) 
-                return true;
-           
-            if(obj is UnityEngine.Object unityObj)
+            if (!hasCachedReference)
+                return false;
+
+            if (reference == null)
+                return false;
+
+            if (ReferenceEquals(reference, null))
+                return false;
+
+            if (reference is UnityEngine.Object unityObj)
             {
-                if ((obj as UnityEngine.Object) == null) 
-                    return true;
+                if ((reference as UnityEngine.Object) == null)
+                    return false;
 
                 if (lastFrameCheckedForNativeAlive != Time.frameCount)
                 {
@@ -69,7 +75,7 @@ namespace BrunoMikoski.ServicesLocation
                 }
             }
 
-            return false;
+            return true;
         }
 
         public static implicit operator T(ServiceReference<T> serviceReference)
