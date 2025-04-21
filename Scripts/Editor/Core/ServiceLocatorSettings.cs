@@ -36,6 +36,7 @@ namespace BrunoMikoski.ServicesLocation
                         
                         settings.ServicesFileName = EditorGUILayout.TextField("Services FileName", settings.ServicesFileName);
                         settings.ReferenceClassName = EditorGUILayout.TextField("Reference Class Name", settings.ReferenceClassName);
+                        settings.TargetNamespace = EditorGUILayout.TextField("Namespace", settings.TargetNamespace);
                         settings.GenerateStaticFileOnScriptReload = EditorGUILayout.Toggle("Auto Generate", settings.GenerateStaticFileOnScriptReload);
                         EditorGUI.indentLevel--;
 
@@ -169,7 +170,15 @@ namespace BrunoMikoski.ServicesLocation
             get => stripIFromNames;
             set => stripIFromNames = value;
         }
-        
+
+        [SerializeField]
+        private string targetNamespace = "BrunoMikoski.ServicesLocation";
+        public string TargetNamespace
+        {
+            get => targetNamespace;
+            set => targetNamespace = value;
+        }
+
 
         public void Save()
         {
