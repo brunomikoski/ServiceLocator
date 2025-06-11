@@ -8,28 +8,38 @@ namespace BrunoMikoski.ServicesLocation
 {
     public class ServiceReference<T> : IServiceObservable where T : class
     {
-        private int lastFrameCheckedForNativeAlive;
-
+        private bool loadedOnce;
         private bool hasCachedReference;
         private T reference;
         public T Reference
         {
             get
             {
-                if (!hasCachedReference)
-                {
-                    if (ServiceLocator.IsQuitting)
-                        return null;
-
-                    hasCachedReference = ServiceLocator.Instance.TryGetInstance(out reference);
-                    if (hasCachedReference)
-                    {
-                        ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
-                        ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
-                    }
-                }
+                if (!TryLoadReference()) 
+                    return null;
+                
                 return reference;
             }
+        }
+
+        private bool TryLoadReference()
+        {
+            if (hasCachedReference) 
+                return true;
+            
+            if (ServiceLocator.IsQuitting)
+                return false;
+            
+            loadedOnce = true;
+
+            hasCachedReference = ServiceLocator.Instance.TryGetInstance(out reference);
+            if (hasCachedReference)
+            {
+                ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
+                ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+            }
+
+            return hasCachedReference;
         }
 
         /// <summary>
@@ -52,29 +62,50 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        public bool HasValidCachedReference()
+      public bool HasValidCachedReference()
         {
-            if (!hasCachedReference)
-                return false;
-
-            if (reference == null)
-                return false;
-
-            if (ReferenceEquals(reference, null))
-                return false;
-
-            if (reference is UnityEngine.Object unityObj)
+            if (!loadedOnce)
             {
-                if ((reference as UnityEngine.Object) == null)
-                    return false;
-
-                if (lastFrameCheckedForNativeAlive != Time.frameCount)
+                if (!TryLoadReference())
                 {
-                    lastFrameCheckedForNativeAlive = Time.frameCount;
-                    return !unityObj.IsNativeObjectAlive();
+                    Debug.Log("[ServiceReference] Failed to load reference.");
+                    return false;
                 }
             }
-
+            
+            if (!hasCachedReference)
+            {
+                Debug.Log("[ServiceReference] No cached reference.");
+                return false;
+            }
+        
+            if (reference == null)
+            {
+                Debug.Log("[ServiceReference] Reference is null.");
+                return false;
+            }
+        
+            if (ReferenceEquals(reference, null))
+            {
+                Debug.Log("[ServiceReference] ReferenceEquals check failed (reference is null).");
+                return false;
+            }
+        
+            if (reference is UnityEngine.Object unityObj)
+            {
+                if (unityObj == null)
+                {
+                    Debug.Log("[ServiceReference] UnityEngine.Object reference is null (Unity native object destroyed).");
+                    return false;
+                }
+        
+                if (reference is null)
+                {
+                    Debug.Log("[ServiceReference] Unity native object is not alive.");
+                    return false;
+                }
+            }
+        
             return true;
         }
 
