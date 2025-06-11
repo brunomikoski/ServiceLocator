@@ -42,9 +42,9 @@ namespace BrunoMikoski.ServicesLocation
             return hasCachedReference;
         }
 
+        
         /// <summary>
-        /// This method will check if the service exist, and if its a Object if its not pending to be destroyed.
-        /// Its expensive so don't use it on a Update loop
+        /// Check if service Exist independently of the cached reference.
         /// </summary>
         public bool Exists
         {
@@ -53,27 +53,30 @@ namespace BrunoMikoski.ServicesLocation
                 if (ServiceLocator.IsQuitting)
                     return false;
                 
-                if (ServiceLocator.Instance.HasService<T>())
-                {
-                    return HasValidCachedReference();
-                }
+                return ServiceLocator.Instance.HasService<T>();
+            }
+        }
 
-                return false;
+        /// <summary>
+        /// Check if the service exists and still have a valid cached reference.
+        /// </summary>
+        public bool HasCachedReference
+        {
+            get
+            {
+                if (ServiceLocator.IsQuitting)
+                    return false;
+
+                if (!ServiceLocator.Instance.HasService<T>())
+                    return false;
+                
+                return HasValidCachedReference();
             }
         }
 
         private bool HasValidCachedReference()
         {
-            if (!loadedOnce)
-            {
-                if (!TryLoadReference())
-                    return false;
-            }
-
             if (!hasCachedReference)
-                return false;
-
-            if (reference == null)
                 return false;
 
             if (ReferenceEquals(reference, null))
