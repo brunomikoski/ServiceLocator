@@ -62,50 +62,32 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-      public bool HasValidCachedReference()
+        private bool HasValidCachedReference()
         {
             if (!loadedOnce)
             {
                 if (!TryLoadReference())
-                {
-                    Debug.Log("[ServiceReference] Failed to load reference.");
                     return false;
-                }
             }
-            
+
             if (!hasCachedReference)
-            {
-                Debug.Log("[ServiceReference] No cached reference.");
                 return false;
-            }
-        
+
             if (reference == null)
-            {
-                Debug.Log("[ServiceReference] Reference is null.");
                 return false;
-            }
-        
+
             if (ReferenceEquals(reference, null))
-            {
-                Debug.Log("[ServiceReference] ReferenceEquals check failed (reference is null).");
                 return false;
-            }
-        
+
             if (reference is UnityEngine.Object unityObj)
             {
                 if (unityObj == null)
-                {
-                    Debug.Log("[ServiceReference] UnityEngine.Object reference is null (Unity native object destroyed).");
                     return false;
-                }
-        
+
                 if (reference is null)
-                {
-                    Debug.Log("[ServiceReference] Unity native object is not alive.");
                     return false;
-                }
             }
-        
+
             return true;
         }
 
