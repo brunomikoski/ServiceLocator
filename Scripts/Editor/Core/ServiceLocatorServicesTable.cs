@@ -7,7 +7,11 @@ using UnityEngine;
 
 namespace BrunoMikoski.ServicesLocation
 {
+#if UNITY_6000_0_OR_NEWER
+    public class AvailableServiceViewItem : TreeViewItem<int>
+#else
     public class AvailableServiceViewItem : TreeViewItem
+#endif
     {
         public ServiceImplementationAttribute ServiceAttribute { get; set; }
         public string GroupName = "";
@@ -55,12 +59,34 @@ namespace BrunoMikoski.ServicesLocation
         }
     }
     
+#if UNITY_6000_0_OR_NEWER
+    public class AvailableServiceTreeView : TreeView<int>
+#else
     public class AvailableServiceTreeView : TreeView
+#endif
     {
         private const string SORTED_COLUMN_INDEX_STATE_KEY = "AvailableServiceTreeView_sortedColumnIndex";
 
+#if UNITY_6000_0_OR_NEWER
+        public IReadOnlyList<TreeViewItem<int>> CurrentBindingItems;
+#else
         public IReadOnlyList<TreeViewItem> CurrentBindingItems;
+#endif
 
+#if UNITY_6000_0_OR_NEWER
+        public AvailableServiceTreeView()
+            : this(new TreeViewState<int>(), new MultiColumnHeader(new MultiColumnHeaderState(new[]
+            {
+                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Enabled"), width = 3},
+                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Group Name"), width = 5},
+                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Name"), width = 10},
+                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Implementation Type"), width = 10},
+                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Dependencies"), width = 20},
+                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Assembly"), width = 10},
+            })))
+        {
+        }
+#else
         public AvailableServiceTreeView()
             : this(new TreeViewState(), new MultiColumnHeader(new MultiColumnHeaderState(new[]
             {
@@ -73,8 +99,13 @@ namespace BrunoMikoski.ServicesLocation
             })))
         {
         }
+#endif
 
+#if UNITY_6000_0_OR_NEWER
+        AvailableServiceTreeView(TreeViewState<int> state, MultiColumnHeader header)
+#else
         AvailableServiceTreeView(TreeViewState state, MultiColumnHeader header)
+#endif
             : base(state, header)
         {
             rowHeight = 20;
@@ -141,16 +172,22 @@ namespace BrunoMikoski.ServicesLocation
                     throw new ArgumentOutOfRangeException(nameof(index), index, null);
             }
 
+#if UNITY_6000_0_OR_NEWER
+            var list = orderedEnumerable.Cast<TreeViewItem<int>>().ToList();
+            rootItem.children = list;
+            CurrentBindingItems = list;
+            BuildRows(rootItem);
+#else
             CurrentBindingItems = rootItem.children = orderedEnumerable.Cast<TreeViewItem>().ToList();
             BuildRows(rootItem);
+#endif
         }
 
-        protected override TreeViewItem BuildRoot()
+#if UNITY_6000_0_OR_NEWER
+        protected override TreeViewItem<int> BuildRoot()
         {
-            TreeViewItem root = new TreeViewItem { depth = -1 };
-            List<TreeViewItem> children = new List<TreeViewItem>();
-
-
+            TreeViewItem<int> root = new TreeViewItem<int>(0, -1);
+            List<TreeViewItem<int>> children = new List<TreeViewItem<int>>();
 
             Dictionary<string, List<ServiceImplementationAttribute>> items = ServiceLocatorCodeGenerator.GetAvailableServices(false);
 
@@ -168,18 +205,52 @@ namespace BrunoMikoski.ServicesLocation
             }
 
             CurrentBindingItems = children;
-            root.children = CurrentBindingItems as List<TreeViewItem>;
+            root.children = children;
             return root;
         }
+#else
+        protected override TreeViewItem BuildRoot()
+        {
+            TreeViewItem root = new TreeViewItem { depth = -1 };
+            List<TreeViewItem> children = new List<TreeViewItem>();
 
+            Dictionary<string, List<ServiceImplementationAttribute>> items = ServiceLocatorCodeGenerator.GetAvailableServices(false);
+
+            foreach (var groupToServiceList in items)
+            {
+                for (int i = 0; i < groupToServiceList.Value.Count; i++)
+                {
+                    ServiceImplementationAttribute attribute = groupToServiceList.Value[i];
+                    children.Add(new AvailableServiceViewItem(children.Count)
+                    {
+                        GroupName = groupToServiceList.Key,
+                        ServiceAttribute = attribute
+                    });
+                }
+            }
+
+            CurrentBindingItems = children;
+            root.children = children;
+            return root;
+        }
+#endif
+
+#if UNITY_6000_0_OR_NEWER
+        protected override bool CanMultiSelect(TreeViewItem<int> item)
+#else
         protected override bool CanMultiSelect(TreeViewItem item)
+#endif
         {
             return false;
         }
 
         protected override void RowGUI(RowGUIArgs args)
         {
+#if UNITY_6000_0_OR_NEWER
+            var item = FindItem(args.item.id, rootItem) as AvailableServiceViewItem;
+#else
             var item = args.item as AvailableServiceViewItem;
+#endif
 
             for (var visibleColumnIndex = 0; visibleColumnIndex < args.GetNumVisibleColumns(); visibleColumnIndex++)
             {
