@@ -252,6 +252,9 @@ namespace BrunoMikoski.ServicesLocation
             var item = args.item as AvailableServiceViewItem;
 #endif
 
+            if (item == null)
+                return;
+            
             for (var visibleColumnIndex = 0; visibleColumnIndex < args.GetNumVisibleColumns(); visibleColumnIndex++)
             {
                 Rect rect = args.GetCellRect(visibleColumnIndex);
