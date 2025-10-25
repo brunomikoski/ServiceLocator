@@ -48,7 +48,8 @@ namespace BrunoMikoski.ServicesLocation
 
             EditorGUI.indentLevel++;
 
-            foreach (KeyValuePair<Type, object> kv in map.ToArray().OrderBy(kv => kv.Key.FullName))
+            IOrderedEnumerable<KeyValuePair<Type, object>> iOrderedEnumerable = map.ToArray().OrderBy(kv => kv.Key.FullName);
+            foreach (KeyValuePair<Type, object> kv in iOrderedEnumerable)
             {
                 Type serviceType = kv.Key;
                 object instance = kv.Value;
