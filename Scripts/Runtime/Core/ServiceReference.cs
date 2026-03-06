@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 #if UNITASK_ENABLED
 using Cysharp.Threading.Tasks;
@@ -21,6 +23,8 @@ namespace BrunoMikoski.ServicesLocation
                 return reference;
             }
         }
+        
+        private List<Action> waitingForServiceToBeAvailableCallbacks = new();
 
         private bool TryLoadReference()
         {
@@ -115,6 +119,13 @@ namespace BrunoMikoski.ServicesLocation
         
             reference = newReference;
             hasCachedReference = true;
+
+            foreach (Action callback in waitingForServiceToBeAvailableCallbacks)
+            {
+                callback.Invoke();
+            }
+            
+            waitingForServiceToBeAvailableCallbacks.Clear();
         }
         
         void IServiceObservable.OnServiceUnregistered(Type targetType)
@@ -128,5 +139,18 @@ namespace BrunoMikoski.ServicesLocation
             await ServiceLocator.Instance.WaitForServiceAsync<T>();
         }
 #endif
+        public void WhenServiceGetsRegistered(Action callback)
+        {
+            if (Exists)
+            {
+                callback.Invoke();
+                return;
+            }
+
+            if (waitingForServiceToBeAvailableCallbacks.Contains(callback))
+                return;
+
+            waitingForServiceToBeAvailableCallbacks.Add(callback);
+        }
     }
 }
