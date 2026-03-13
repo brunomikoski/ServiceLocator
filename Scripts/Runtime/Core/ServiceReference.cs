@@ -203,15 +203,19 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        public void WhenServiceBecomeAvailable(Action callback)
+        public void WhenServiceBecomesAvailable(Action callback)
         {
-            ServiceLocator.Instance.StartCoroutine(WaitForServiceBeAvailableEnumeratorWithCallback(callback));
-        }
+            if (callback == null)
+                throw new ArgumentNullException(nameof(callback));
+                
+            OnWhenServiceGetsRegistered += ServiceAvailable;
+            return;
 
-        private IEnumerator WaitForServiceBeAvailableEnumeratorWithCallback(Action callback)
-        {
-            yield return WaitForServiceBeAvailableEnumerator();
-            callback.Invoke();
+            void ServiceAvailable()
+            {
+                callback.Invoke();
+                OnWhenServiceGetsRegistered -= ServiceAvailable;
+            }
         }
     }
 }
