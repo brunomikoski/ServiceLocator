@@ -24,8 +24,14 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
         
-        private List<Action> waitingForServiceToBeAvailableCallbacks = new();
+        private readonly List<Action> waitingForServiceToBeAvailableCallbacks = new();
+        private bool _subscribedToServiceChanges;
 
+        ~ServiceReference(){
+            _subscribedToServiceChanges = false;
+            ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
+        }
+        
         private bool TryLoadReference()
         {
             if (hasCachedReference) 
@@ -39,14 +45,22 @@ namespace BrunoMikoski.ServicesLocation
             hasCachedReference = ServiceLocator.Instance.TryGetInstance(out reference);
             if (hasCachedReference)
             {
-                ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
-                ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+                SubscribeToServiceChanges();
             }
 
             return hasCachedReference;
         }
 
-        
+        private void SubscribeToServiceChanges()
+        {
+            if (_subscribedToServiceChanges)
+                return;
+            
+            _subscribedToServiceChanges = true;
+            ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+        }
+
+
         /// <summary>
         /// Check if service Exist independently of the cached reference.
         /// </summary>
@@ -150,6 +164,8 @@ namespace BrunoMikoski.ServicesLocation
             if (waitingForServiceToBeAvailableCallbacks.Contains(callback))
                 return;
 
+            SubscribeToServiceChanges();
+            
             waitingForServiceToBeAvailableCallbacks.Add(callback);
         }
     }
