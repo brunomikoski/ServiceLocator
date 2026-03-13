@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
 #if UNITASK_ENABLED
 using Cysharp.Threading.Tasks;
 #endif
@@ -24,10 +22,41 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
         
-        private readonly List<Action> waitingForServiceToBeAvailableCallbacks = new();
         private bool _subscribedToServiceChanges;
 
-        ~ServiceReference(){
+        private Action onWhenServiceGetsRegistered;
+        public event Action OnWhenServiceGetsRegistered
+        {
+            add
+            {
+                if (Exists)
+                {
+                    value.Invoke();
+                }
+                SubscribeToServiceChanges();
+                onWhenServiceGetsRegistered += value;
+            }
+            remove => onWhenServiceGetsRegistered -= value;
+        }
+        
+        
+        private Action onWhenServiceGetsUnregistered;
+        public event Action OnWhenServiceGetsUnregistered
+        {
+            add
+            {
+                if (Exists)
+                {
+                    value.Invoke();
+                }
+                SubscribeToServiceChanges();
+                onWhenServiceGetsUnregistered += value;
+            }
+            remove => onWhenServiceGetsUnregistered -= value;
+        }
+
+        ~ServiceReference()
+        {
             _subscribedToServiceChanges = false;
             ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
         }
@@ -46,6 +75,7 @@ namespace BrunoMikoski.ServicesLocation
             if (hasCachedReference)
             {
                 SubscribeToServiceChanges();
+                onWhenServiceGetsRegistered?.Invoke();
             }
 
             return hasCachedReference;
@@ -58,6 +88,15 @@ namespace BrunoMikoski.ServicesLocation
             
             _subscribedToServiceChanges = true;
             ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+        }
+        
+        private void UnsubscribeFromServiceChanges()
+        {
+            if (!_subscribedToServiceChanges)
+                return;
+            
+            _subscribedToServiceChanges = false;
+            ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
         }
 
 
@@ -125,26 +164,29 @@ namespace BrunoMikoski.ServicesLocation
         
         void IServiceObservable.OnServiceRegistered(Type targetType)
         {
+            if (targetType != typeof(T))
+                return;
+            
             if (!ServiceLocator.Instance.TryGetInstance(out T newReference))
                 return;
-            
-            if (Equals(newReference, reference))
-                return;
-        
-            reference = newReference;
-            hasCachedReference = true;
 
-            foreach (Action callback in waitingForServiceToBeAvailableCallbacks)
+            if (!Equals(newReference, reference) && reference != null)
             {
-                callback.Invoke();
+                ClearCache();
+                return;
             }
-            
-            waitingForServiceToBeAvailableCallbacks.Clear();
+
+            hasCachedReference = false;
+            TryLoadReference();
         }
         
         void IServiceObservable.OnServiceUnregistered(Type targetType)
         {
+            if (targetType != typeof(T))
+                return;
+            
             ClearCache();
+            onWhenServiceGetsUnregistered?.Invoke();
         }
 
 #if UNITASK_ENABLED
@@ -153,20 +195,23 @@ namespace BrunoMikoski.ServicesLocation
             await ServiceLocator.Instance.WaitForServiceAsync<T>();
         }
 #endif
-        public void WhenServiceGetsRegistered(Action callback)
+        public IEnumerator WaitForServiceBeAvailableEnumerator()
         {
-            if (Exists)
+            while (!Exists)
             {
-                callback.Invoke();
-                return;
+                yield return null;
             }
+        }
 
-            if (waitingForServiceToBeAvailableCallbacks.Contains(callback))
-                return;
+        public void WhenServiceBecomeAvailable(Action callback)
+        {
+            ServiceLocator.Instance.StartCoroutine(WaitForServiceBeAvailableEnumeratorWithCallback(callback));
+        }
 
-            SubscribeToServiceChanges();
-            
-            waitingForServiceToBeAvailableCallbacks.Add(callback);
+        private IEnumerator WaitForServiceBeAvailableEnumeratorWithCallback(Action callback)
+        {
+            yield return WaitForServiceBeAvailableEnumerator();
+            callback.Invoke();
         }
     }
 }
