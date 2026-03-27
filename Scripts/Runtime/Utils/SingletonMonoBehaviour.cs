@@ -6,14 +6,13 @@ namespace BrunoMikoski.ServicesLocation
     [Preserve]
     public abstract class SingletonMonoBehaviour<T> : MonoBehaviour where T : Component
     {
-#if UNITY_EDITOR
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void Init()
+
+        // This method will be called by the static SingletonResetter script
+        public static void ResetSingleton()
         {
             instance = null;
             hasInstance = false;
         }
-#endif
 
         private static bool hasInstance;
         private static T instance;
