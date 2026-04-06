@@ -5,6 +5,10 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 
+#if UNITY_6000_0_OR_NEWER
+#pragma warning disable CS0618 // TreeViewItem is obsolete in Unity 6 — suppress until migrated to UI Toolkit
+#endif
+
 namespace BrunoMikoski.ServicesLocation
 {
     public class AvailableServiceViewItem : TreeViewItem
@@ -307,3 +311,7 @@ namespace BrunoMikoski.ServicesLocation
         }
     }
 }
+
+#if UNITY_6000_0_OR_NEWER
+#pragma warning restore CS0618
+#endif
