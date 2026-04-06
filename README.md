@@ -31,58 +31,224 @@
 	</a>
 </p>
 
-
-Simple service locator for Unity3D
+A lightweight service locator pattern implementation for Unity, designed to give you full control over service initialization order, lifetime, and access across your project.
 
 ## Features
- - Code generation for easy access
- - Easy mockup setup
- - Simple replace system
- - Simple and Fast
 
-## FAQ (WIP)
+- Register and resolve services by type at runtime
+- Automatic dependency ordering via `[ServiceImplementation(DependsOn = ...)]`
+- `ServiceReference<T>` for lazy, cached access with lifecycle events
+- `ServicesReporterBase` for grouping service registration by scene/context
+- Optional code generation for static access to services
+- Conditional service registration via `IConditionalService`
+- Lifecycle callbacks via `IOnServiceRegistered` / `IOnServiceUnregistered`
+- UniTask support for async service waiting
 
-### Setup 
-The idea of the `ServiceLocator` is that you can have full control of initialization and lifetime of all your project services.
-The way I suggest doing this is creating different places for registering services, for instance you might have your Main services that are available everywhere, and you also have your gameplay Services and maybe Meta Services.
-So you would have 3 classes that extends `ServicesReporterBase` like `MainServiceReporter`, `GameplayServiceReporter` and `MetaServiceReporter` and they would report services on `RegisterServices()` and `UnregisterServices()`
+## Quick Start
 
-If you have a service that depends on other services, you can use the `IDependsOnServices` interface and allow the ServiceLocator take care of their initialization
+### 1. Define a Service
 
-### Resolving Dependencies
-The system provides 2 ways of dealing with dependencies. 
-You can use both `IDependsOnServices` or `IDependsOnExplicitServices` interfaces to define dependencies
-
-#### IDependsOnServices
-This interface will try to find dependencies on your code and store this into a json file everytime you have script changes. So when you want the dependencies to be resolver you can use the `ServiceLocator.Instance.ResolveDependencies()` to make sure the class is initialized with all the dependencies resolved.
-
-#### IDependsOnExplicitServices
-Its almost the same as the `IDependsOnServices`, but this one allows you explicit state the dependencies on your classes.
-
-### Code Generation
-If you are using the code generation for services, any class that implements the `[ServiceImplementation]` will be added to the static `Service` file, so a class like this: 
+Any class can be a service. Use `[ServiceImplementation]` to enable code generation and declare dependencies:
 
 ```csharp
-[ServiceImplementation(Category = "Main", Type = typeof(IFoo))]
-public class FooService : MonoBehaviour, IFoo
+[ServiceImplementation(DependsOn = new[] { typeof(SettingsService) })]
+public class AudioService : MonoBehaviour, IOnServiceRegistered, IOnServiceUnregistered
 {
-    
-}
+    private readonly ServiceReference<SettingsService> _settingsService = new();
 
+    void IOnServiceRegistered.OnRegisteredOnServiceLocator(ServiceLocator serviceLocator)
+    {
+        // Safe to access dependencies here - they are guaranteed to be registered
+        _settingsService.Reference.Settings.Audio.MasterVolume.OnChangedEvent += OnMasterVolumeChanged;
+    }
+
+    void IOnServiceUnregistered.OnUnregisteredFromServiceLocator(ServiceLocator serviceLocator)
+    {
+        if (_settingsService.HasCachedReference)
+        {
+            _settingsService.Reference.Settings.Audio.MasterVolume.OnChangedEvent -= OnMasterVolumeChanged;
+        }
+    }
+}
 ```
 
-Can be accessed by:
-`Services.Main.Foo`
+### 2. Register Services with a Reporter
 
-You can also directly access the ServiceReference that is a weak reference to check if the service is still exist or not `Services.Main.Ref.Foo`
+Create `ServicesReporterBase` subclasses to group services by context (bootstrap, gameplay, lobby, etc.). The reporter registers on `Awake` and unregisters on `OnDestroy`, tying service lifetime to the scene.
 
-### How I can register a service to be available
- You can register any service by using `ServiceLocator.Instance.RegisterInstance(serviceInstance);`
+```csharp
+public class BootstrapServiceReporter : ServicesReporterBase
+{
+    [SerializeField] private AudioService _audioService;
+    [SerializeField] private SettingsService _settingsService;
+    [SerializeField] private InputService _inputService;
 
-### How I can access one service.
-There's multiple ways of accessing it, you can use `ServiceLocator.Instance.GetInstance<T>` or you can use the `ServiceReference<T>` to access it as well, or if you are using the code generation you can use the quick access like `Services.YourService`
+    protected override void RegisterServices()
+    {
+        ServiceLocator.Instance.RegisterInstance(_settingsService);
+        ServiceLocator.Instance.RegisterInstance(_audioService);    // waits for SettingsService via DependsOn
+        ServiceLocator.Instance.RegisterInstance(_inputService);
+    }
 
-## How to install
+    protected override void UnregisterServices()
+    {
+        ServiceLocator.Instance.UnregisterInstance(_audioService);
+        ServiceLocator.Instance.UnregisterInstance(_settingsService);
+        ServiceLocator.Instance.UnregisterInstance(_inputService);
+    }
+}
+```
+
+Scene-scoped reporters let you register services that only live during a specific game state:
+
+```csharp
+public class LobbyServiceReporter : ServicesReporterBase
+{
+    [SerializeField] private CameraService _cameraService;
+    [SerializeField] private LobbyService _lobbyService;
+
+    protected override void RegisterServices()
+    {
+        ServiceLocator.Instance.RegisterInstance(_cameraService);
+        ServiceLocator.Instance.RegisterInstance(_lobbyService);
+    }
+
+    protected override void UnregisterServices()
+    {
+        ServiceLocator.Instance.UnregisterInstance(_cameraService);
+        ServiceLocator.Instance.UnregisterInstance(_lobbyService);
+    }
+}
+```
+
+### 3. Access Services
+
+#### ServiceReference (recommended)
+
+`ServiceReference<T>` is the primary way to access services. It provides lazy resolution, caching, and automatic cache invalidation when services are registered/unregistered:
+
+```csharp
+public class InGameMenuController : MonoBehaviour
+{
+    private readonly ServiceReference<GameplayService> _gameplayService = new();
+    private readonly ServiceReference<SessionService> _sessionService = new();
+
+    private void OnEnable()
+    {
+        // .Reference resolves and caches the service on first access
+        _lobbyButton.gameObject.SetActive(_sessionService.Reference.IsHost);
+    }
+}
+```
+
+#### Checking availability
+
+```csharp
+// Check if the service is registered (does not cache)
+if (_audioService.Exists) { ... }
+
+// Check if the service is registered AND we have a valid cached reference
+if (_audioService.HasCachedReference) { ... }
+```
+
+#### Reacting to service registration
+
+```csharp
+// One-shot callback: fires immediately if already registered, then unsubscribes
+_audioService.WhenServiceBecomesAvailable(() =>
+{
+    // Service is now available
+});
+
+// Persistent events: fires on every register/unregister
+_audioService.OnWhenServiceGetsRegistered += OnAudioAvailable;
+_audioService.OnWhenServiceGetsUnregistered += OnAudioRemoved;
+```
+
+#### Waiting for services (coroutine)
+
+```csharp
+private IEnumerator Start()
+{
+    yield return _audioService.WaitForServiceBeAvailableEnumerator();
+    // AudioService is now available
+}
+```
+
+#### Waiting for services (UniTask)
+
+Requires the `UNITASK_ENABLED` scripting define:
+
+```csharp
+private async UniTask InitializeAsync(CancellationToken token)
+{
+    await _audioService.WaitForServiceBeAvailableAsync();
+    // or directly:
+    await ServiceLocator.Instance.WaitForServiceAsync<AudioService>(token);
+}
+```
+
+#### Direct access
+
+For cases where you know the service is registered:
+
+```csharp
+var audio = ServiceLocator.Instance.GetInstance<AudioService>();
+
+// Safe variant
+if (ServiceLocator.Instance.TryGetInstance<AudioService>(out var audio))
+{
+    audio.PlaySound(...);
+}
+```
+
+### 4. Interface Registration
+
+You can register a concrete type under an interface or base class, allowing consumers to depend on abstractions:
+
+```csharp
+// Register the concrete type under its base class
+ServiceLocator.Instance.RegisterInstance<PhysicsService>(networkedPhysicsService);
+
+// Consumers only know about the base type
+private readonly ServiceReference<PhysicsService> _physics = new();
+```
+
+## Dependency Ordering
+
+Services decorated with `[ServiceImplementation(DependsOn = ...)]` are automatically held in a waiting queue until all their dependencies are registered. This means you can register services in any order and the locator will resolve them correctly:
+
+```csharp
+[ServiceImplementation(DependsOn = new[] { typeof(SaveDataService), typeof(GraphicsService) })]
+public class SettingsService : MonoBehaviour { ... }
+```
+
+If `SettingsService` is registered before `SaveDataService`, it will be queued and automatically registered once `SaveDataService` becomes available.
+
+## Lifecycle Interfaces
+
+| Interface | When it fires |
+|---|---|
+| `IOnServiceRegistered` | Immediately after the service is added to the locator |
+| `IOnServiceUnregistered` | Immediately before the service is removed from the locator |
+| `IConditionalService` | Called during registration to decide if the service should be registered at all |
+
+## Code Generation
+
+Classes with `[ServiceImplementation]` are picked up by the code generator, creating a static file for direct access:
+
+```csharp
+[ServiceImplementation(Category = "Game")]
+public class GameplayService : MonoBehaviour { ... }
+
+// Generated static access:
+Services.Game.Gameplay            // returns the service instance
+Services.Game.Ref.Gameplay        // returns the ServiceReference<T>
+```
+
+Configure code generation in **Project Settings > Service Locator**.
+
+## How to Install
 
 <details>
 <summary>Add from OpenUPM <em>| via scoped registry, recommended</em></summary>
@@ -107,9 +273,7 @@ To add the package to your project:
 </details>
 
 <details>
-<summary>Add from GitHub | <em>not recommended, no updates :( </em></summary>
-
-You can also add it directly from GitHub on Unity 2019.4+. Note that you won't be able to receive updates through Package Manager this way, you'll have to update manually.
+<summary>Add from GitHub</summary>
 
 - open Package Manager
 - click <kbd>+</kbd>
