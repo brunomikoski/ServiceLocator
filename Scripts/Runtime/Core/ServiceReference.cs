@@ -8,7 +8,6 @@ namespace BrunoMikoski.ServicesLocation
 {
     public class ServiceReference<T> : IServiceObservable where T : class
     {
-        private bool loadedOnce;
         private bool hasCachedReference;
         private T reference;
         public T Reference
@@ -63,8 +62,6 @@ namespace BrunoMikoski.ServicesLocation
 
             if (ServiceLocator.IsQuitting)
                 return false;
-
-            loadedOnce = true;
 
             hasCachedReference = ServiceLocator.Instance.TryGetInstance(out reference);
             if (hasCachedReference)
