@@ -6,14 +6,14 @@ namespace BrunoMikoski.ServicesLocation
     [Preserve]
     public abstract class SingletonMonoBehaviour<T> : MonoBehaviour where T : Component
     {
-#if UNITY_EDITOR
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void Init()
+        static SingletonMonoBehaviour()
         {
-            instance = null;
-            hasInstance = false;
+            SingletonRegistry.RegisterResetCallback(() =>
+            {
+                instance = null;
+                hasInstance = false;
+            });
         }
-#endif
 
         private static bool hasInstance;
         private static T instance;
@@ -24,7 +24,7 @@ namespace BrunoMikoski.ServicesLocation
                 if (!hasInstance)
                 {
 #if UNITY_6000_0_OR_NEWER
-                    instance = FindFirstObjectByType<T>();
+                    instance = FindAnyObjectByType<T>();
 #else
                     instance = FindObjectOfType<T>();
 #endif
@@ -43,7 +43,7 @@ namespace BrunoMikoski.ServicesLocation
                 return instance;
             }
         }
-        
+
         protected virtual void Awake()
         {
             if (instance == null)
