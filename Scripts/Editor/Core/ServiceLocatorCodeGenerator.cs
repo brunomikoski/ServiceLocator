@@ -65,9 +65,6 @@ namespace BrunoMikoski.ServicesLocation
                     if (!result.ContainsKey(serviceImplementationAttribute.Category))
                         result.Add(serviceImplementationAttribute.Category, new List<ServiceImplementationAttribute>());
 
-                    if (onlyEnabled && !ServiceLocatorSettings.Instance.IsServiceEnabled(serviceImplementationAttribute))
-                        continue;
-
                     result[serviceImplementationAttribute.Category].Add(serviceImplementationAttribute);
                 }
             }

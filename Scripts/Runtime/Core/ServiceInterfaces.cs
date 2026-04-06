@@ -21,11 +21,6 @@ namespace BrunoMikoski.ServicesLocation
         void OnUnregisteredFromServiceLocator(ServiceLocator serviceLocator);
     }
 
-    public interface IOnInjected
-    {
-        void OnInjected();
-    }
-
     public interface IServiceObservable
     {
         void OnServiceRegistered(Type targetType);

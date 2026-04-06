@@ -1,5 +1,5 @@
-﻿using System;
-using UnityEngine;
+using System;
+using System.Collections;
 #if UNITASK_ENABLED
 using Cysharp.Threading.Tasks;
 #endif
@@ -15,34 +15,86 @@ namespace BrunoMikoski.ServicesLocation
         {
             get
             {
-                if (!TryLoadReference()) 
+                if (!TryLoadReference())
                     return null;
-                
+
                 return reference;
             }
         }
 
+        private bool _subscribedToServiceChanges;
+
+        private Action onWhenServiceGetsRegistered;
+        public event Action OnWhenServiceGetsRegistered
+        {
+            add
+            {
+                if (Exists)
+                {
+                    value.Invoke();
+                }
+                SubscribeToServiceChanges();
+                onWhenServiceGetsRegistered += value;
+            }
+            remove => onWhenServiceGetsRegistered -= value;
+        }
+
+
+        private Action onWhenServiceGetsUnregistered;
+        public event Action OnWhenServiceGetsUnregistered
+        {
+            add
+            {
+                SubscribeToServiceChanges();
+                onWhenServiceGetsUnregistered += value;
+            }
+            remove => onWhenServiceGetsUnregistered -= value;
+        }
+
+        ~ServiceReference()
+        {
+            _subscribedToServiceChanges = false;
+        }
+
         private bool TryLoadReference()
         {
-            if (hasCachedReference) 
+            if (hasCachedReference)
                 return true;
-            
+
             if (ServiceLocator.IsQuitting)
                 return false;
-            
+
             loadedOnce = true;
 
             hasCachedReference = ServiceLocator.Instance.TryGetInstance(out reference);
             if (hasCachedReference)
             {
-                ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
-                ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+                SubscribeToServiceChanges();
+                onWhenServiceGetsRegistered?.Invoke();
             }
 
             return hasCachedReference;
         }
 
-        
+        private void SubscribeToServiceChanges()
+        {
+            if (_subscribedToServiceChanges)
+                return;
+
+            _subscribedToServiceChanges = true;
+            ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
+        }
+
+        private void UnsubscribeFromServiceChanges()
+        {
+            if (!_subscribedToServiceChanges)
+                return;
+
+            _subscribedToServiceChanges = false;
+            ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
+        }
+
+
         /// <summary>
         /// Check if service Exist independently of the cached reference.
         /// </summary>
@@ -52,7 +104,7 @@ namespace BrunoMikoski.ServicesLocation
             {
                 if (ServiceLocator.IsQuitting)
                     return false;
-                
+
                 return ServiceLocator.Instance.HasService<T>();
             }
         }
@@ -69,7 +121,7 @@ namespace BrunoMikoski.ServicesLocation
 
                 if (!ServiceLocator.Instance.HasService<T>())
                     return false;
-                
+
                 return HasValidCachedReference();
             }
         }
@@ -104,22 +156,32 @@ namespace BrunoMikoski.ServicesLocation
             reference = null;
             hasCachedReference = false;
         }
-        
+
         void IServiceObservable.OnServiceRegistered(Type targetType)
         {
+            if (targetType != typeof(T))
+                return;
+
             if (!ServiceLocator.Instance.TryGetInstance(out T newReference))
                 return;
-            
-            if (Equals(newReference, reference))
+
+            if (!Equals(newReference, reference) && reference != null)
+            {
+                ClearCache();
                 return;
-        
-            reference = newReference;
-            hasCachedReference = true;
+            }
+
+            hasCachedReference = false;
+            TryLoadReference();
         }
-        
+
         void IServiceObservable.OnServiceUnregistered(Type targetType)
         {
+            if (targetType != typeof(T))
+                return;
+
             ClearCache();
+            onWhenServiceGetsUnregistered?.Invoke();
         }
 
 #if UNITASK_ENABLED
@@ -128,5 +190,27 @@ namespace BrunoMikoski.ServicesLocation
             await ServiceLocator.Instance.WaitForServiceAsync<T>();
         }
 #endif
+        public IEnumerator WaitForServiceBeAvailableEnumerator()
+        {
+            while (!Exists)
+            {
+                yield return null;
+            }
+        }
+
+        public void WhenServiceBecomesAvailable(Action callback)
+        {
+            if (callback == null)
+                throw new ArgumentNullException(nameof(callback));
+
+            OnWhenServiceGetsRegistered += ServiceAvailable;
+            return;
+
+            void ServiceAvailable()
+            {
+                callback.Invoke();
+                OnWhenServiceGetsRegistered -= ServiceAvailable;
+            }
+        }
     }
 }
