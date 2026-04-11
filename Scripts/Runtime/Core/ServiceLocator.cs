@@ -11,23 +11,25 @@ using Cysharp.Threading.Tasks;
 
 namespace BrunoMikoski.ServicesLocation
 {
+    internal static class ServiceLocatorInitializer
+    {
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        private static void Init()
+        {
+            ServiceLocator.IsQuitting = false;
+        }
+    }
+
     [Preserve]
     public class ServiceLocator : SingletonMonoBehaviour<ServiceLocator>
     {
-        internal static bool IsQuitting { get; private set; }
+        internal static bool IsQuitting { get; set; }
 
         private readonly Dictionary<Type, object> serviceTypeToInstances = new();
 
         private readonly Dictionary<Type, List<IServiceObservable>> serviceTypeToObservables = new();
 
         private readonly Dictionary<Type, object> servicesWaitingOnDependenciesTobeResolved = new();
-
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-        private static void Init()
-        {
-            IsQuitting = false;
-        }
 
         public void RegisterInstance<T>(T serviceInstance)
         {
