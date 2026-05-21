@@ -16,7 +16,7 @@ namespace BrunoMikoski.ServicesLocation
         }
 
         protected abstract void RegisterServices();
-        protected abstract void UnregisterServices();
+        public abstract void UnregisterServices();
 
     }
 }

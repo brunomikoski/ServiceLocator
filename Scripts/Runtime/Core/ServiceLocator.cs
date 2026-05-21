@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
+using Fusion;
 using UnityEngine;
+using UnityEngine.Pool;
+using UnityEngine.SceneManagement;
 using UnityEngine.Scripting;
 using Object = UnityEngine.Object;
 #if UNITASK_ENABLED
@@ -317,6 +320,23 @@ namespace BrunoMikoski.ServicesLocation
             }
 
             return true;
+        }
+
+        public void BeforeSceneUnload(Scene targetScene)
+        {
+            List<GameObject> roots = ListPool<GameObject>.Get();
+            List<ServicesReporterBase> reporters = ListPool<ServicesReporterBase>.Get();
+
+            targetScene.GetRootGameObjects(roots);
+            foreach (GameObject root in roots)
+            {
+                root.GetComponentsInChildren(false, reporters);
+                foreach (ServicesReporterBase reporter in reporters)
+                    reporter.UnregisterServices();
+            }
+
+            ListPool<ServicesReporterBase>.Release(reporters);
+            ListPool<GameObject>.Release(roots);
         }
 
 #if UNITASK_ENABLED
