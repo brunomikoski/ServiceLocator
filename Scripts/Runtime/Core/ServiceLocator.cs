@@ -30,7 +30,7 @@ namespace BrunoMikoski.ServicesLocation
 
         private readonly Dictionary<Type, object> serviceTypeToInstances = new();
 
-        private readonly Dictionary<Type, List<IServiceObservable>> serviceTypeToObservables = new();
+        private readonly Dictionary<Type, List<WeakReference<IServiceObservable>>> serviceTypeToObservables = new();
 
         private readonly Dictionary<Type, object> servicesWaitingOnDependenciesTobeResolved = new();
 
@@ -68,11 +68,7 @@ namespace BrunoMikoski.ServicesLocation
             if (serviceInstance is IOnServiceRegistered onRegistered)
                 onRegistered.OnRegisteredOnServiceLocator(this);
 
-            if (serviceTypeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
-            {
-                for (int i = 0; i < observables.Count; i++)
-                    observables[i].OnServiceRegistered(type);
-            }
+            DispatchToObservables(type, true);
         }
 
         private bool CanRegisterService(Type type, object serviceInstance)
@@ -245,31 +241,83 @@ namespace BrunoMikoski.ServicesLocation
             {
                 onServiceUnregistered.OnUnregisteredFromServiceLocator(this);
             }
-            
-            if (serviceTypeToObservables.TryGetValue(targetType, out List<IServiceObservable> observables))
+
+            DispatchToObservables(targetType, false);
+        }
+
+        private void DispatchToObservables(Type type, bool registered)
+        {
+            if (!serviceTypeToObservables.TryGetValue(type, out List<WeakReference<IServiceObservable>> observables))
+                return;
+
+            List<IServiceObservable> snapshot = ListPool<IServiceObservable>.Get();
+            for (int i = observables.Count - 1; i >= 0; i--)
             {
-                for (int i = 0; i < observables.Count; i++)
-                    observables[i].OnServiceUnregistered(targetType);
+                if (observables[i].TryGetTarget(out IServiceObservable target))
+                    snapshot.Add(target);
+                else
+                    observables.RemoveAt(i);
             }
+
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                if (registered)
+                    snapshot[i].OnServiceRegistered(type);
+                else
+                    snapshot[i].OnServiceUnregistered(type);
+            }
+
+            ListPool<IServiceObservable>.Release(snapshot);
         }
 
         public void SubscribeToServiceChanges<T>(IServiceObservable observable)
         {
             Type type = typeof(T);
-            if (!serviceTypeToObservables.ContainsKey(type))
-                serviceTypeToObservables.Add(type, new List<IServiceObservable>());
+            if (!serviceTypeToObservables.TryGetValue(type, out List<WeakReference<IServiceObservable>> observables))
+            {
+                observables = new List<WeakReference<IServiceObservable>>();
+                serviceTypeToObservables.Add(type, observables);
+            }
 
-            if (!serviceTypeToObservables[type].Contains(observable))
-                serviceTypeToObservables[type].Add(observable);
+            for (int i = observables.Count - 1; i >= 0; i--)
+            {
+                if (!observables[i].TryGetTarget(out IServiceObservable existing))
+                    observables.RemoveAt(i);
+                else if (ReferenceEquals(existing, observable))
+                    return;
+            }
+
+            observables.Add(new WeakReference<IServiceObservable>(observable));
         }
-        
+
         public void UnsubscribeToServiceChanges<T>(IServiceObservable observable)
         {
             Type type = typeof(T);
-            if (!serviceTypeToObservables.TryGetValue(type, out List<IServiceObservable> observables))
+            if (!serviceTypeToObservables.TryGetValue(type, out List<WeakReference<IServiceObservable>> observables))
                 return;
 
-            observables.Remove(observable);
+            for (int i = observables.Count - 1; i >= 0; i--)
+            {
+                if (!observables[i].TryGetTarget(out IServiceObservable existing))
+                    observables.RemoveAt(i);
+                else if (ReferenceEquals(existing, observable))
+                    observables.RemoveAt(i);
+            }
+        }
+
+        internal int ObservableCount<T>()
+        {
+            if (!serviceTypeToObservables.TryGetValue(typeof(T), out List<WeakReference<IServiceObservable>> observables))
+                return 0;
+
+            int alive = 0;
+            for (int i = 0; i < observables.Count; i++)
+            {
+                if (observables[i].TryGetTarget(out _))
+                    alive++;
+            }
+
+            return alive;
         }
 
         private void TryResolveDependencies()

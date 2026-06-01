@@ -6,7 +6,7 @@ using Cysharp.Threading.Tasks;
 
 namespace BrunoMikoski.ServicesLocation
 {
-    public class ServiceReference<T> : IServiceObservable where T : class
+    public class ServiceReference<T> : IServiceObservable, IDisposable where T : class
     {
         private bool hasCachedReference;
         private T reference;
@@ -21,7 +21,7 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        private bool _subscribedToServiceChanges;
+        private bool subscribedToServiceChanges;
 
         private Action onWhenServiceGetsRegistered;
         public event Action OnWhenServiceGetsRegistered
@@ -50,11 +50,6 @@ namespace BrunoMikoski.ServicesLocation
             remove => onWhenServiceGetsUnregistered -= value;
         }
 
-        ~ServiceReference()
-        {
-            _subscribedToServiceChanges = false;
-        }
-
         private bool TryLoadReference()
         {
             if (hasCachedReference)
@@ -75,25 +70,35 @@ namespace BrunoMikoski.ServicesLocation
 
         private void SubscribeToServiceChanges()
         {
-            if (_subscribedToServiceChanges)
+            if (subscribedToServiceChanges)
                 return;
 
-            _subscribedToServiceChanges = true;
+            subscribedToServiceChanges = true;
             ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
         }
 
         private void UnsubscribeFromServiceChanges()
         {
-            if (!_subscribedToServiceChanges)
+            if (!subscribedToServiceChanges)
                 return;
 
-            _subscribedToServiceChanges = false;
+            subscribedToServiceChanges = false;
+
+            if (ServiceLocator.IsQuitting)
+                return;
+
             ServiceLocator.Instance.UnsubscribeToServiceChanges<T>(this);
         }
 
 
         /// <summary>
-        /// Check if service Exist independently of the cached reference.
+        /// Returns true if the service is currently registered in the locator, independently of
+        /// this reference's cache.
+        ///
+        /// Has no side effects (no resolve, no subscribe) and works even if you never accessed
+        /// <see cref="Reference"/> — so it's the right check for "is the service available right
+        /// now?" without triggering a lazy load. Contrast with <see cref="HasCachedReference"/>,
+        /// which additionally requires that this instance has already cached a still-valid reference.
         /// </summary>
         public bool Exists
         {
@@ -107,7 +112,17 @@ namespace BrunoMikoski.ServicesLocation
         }
 
         /// <summary>
-        /// Check if the service exists and still have a valid cached reference.
+        /// Returns true only if the service is registered AND this reference has already
+        /// lazily cached it through a prior <see cref="Reference"/> access, and that cache is
+        /// still valid (non-null, and not a destroyed UnityEngine.Object).
+        ///
+        /// Unlike <see cref="Reference"/>, this has no side effects — it does not resolve the
+        /// service or subscribe to changes. So if you never accessed <see cref="Reference"/>
+        /// beforehand, this returns false even when the service is available; the reference
+        /// simply was never cached yet.
+        ///
+        /// Best used in teardown paths (OnDestroy / OnDisable) where you want to act only if the
+        /// service was actually used, without forcing a resolve during shutdown.
         /// </summary>
         public bool HasCachedReference
         {
@@ -152,6 +167,23 @@ namespace BrunoMikoski.ServicesLocation
         {
             reference = null;
             hasCachedReference = false;
+        }
+
+        /// <summary>
+        /// Eagerly releases this reference from the ServiceLocator: unsubscribes from service-change
+        /// notifications, clears the cache, and drops all registered/unregistered delegates.
+        ///
+        /// Optional — the locator now holds observers weakly, so a reference is also reclaimed
+        /// automatically once its owner is garbage collected. Call this from OnDestroy /
+        /// OnUnregisteredFromServiceLocator when you want deterministic, immediate release. Safe to
+        /// call multiple times.
+        /// </summary>
+        public void Dispose()
+        {
+            UnsubscribeFromServiceChanges();
+            ClearCache();
+            onWhenServiceGetsRegistered = null;
+            onWhenServiceGetsUnregistered = null;
         }
 
         void IServiceObservable.OnServiceRegistered(Type targetType)
