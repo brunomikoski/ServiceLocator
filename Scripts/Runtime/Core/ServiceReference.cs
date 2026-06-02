@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using UnityEngine;
 #if UNITASK_ENABLED
 using Cysharp.Threading.Tasks;
 #endif
@@ -9,7 +8,6 @@ namespace BrunoMikoski.ServicesLocation
 {
     public class ServiceReference<T> : IServiceObservable, IDisposable where T : class
     {
-        private bool loadedCachedReferenceOnce;
         private bool hasCachedReference;
         private T reference;
         public T Reference
@@ -65,7 +63,6 @@ namespace BrunoMikoski.ServicesLocation
             {
                 SubscribeToServiceChanges();
                 onWhenServiceGetsRegistered?.Invoke();
-                loadedCachedReferenceOnce = true;
             }
 
             return hasCachedReference;
@@ -136,12 +133,7 @@ namespace BrunoMikoski.ServicesLocation
 
                 if (!ServiceLocator.Instance.HasService<T>())
                     return false;
-#if UNITY_EDITOR
-                if (!loadedCachedReferenceOnce)
-                {
-                    Debug.LogError("HasCachedReference was called before the lazy reference was loaded, so this will return false even though the service might exist. Should you be using Exists instead?");
-                }
-#endif
+
                 return HasValidCachedReference();
             }
         }
