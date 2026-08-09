@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Fusion;
 using UnityEngine;
 using UnityEngine.Pool;
 using UnityEngine.SceneManagement;
