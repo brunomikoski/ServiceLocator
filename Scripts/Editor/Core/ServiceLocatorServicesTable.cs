@@ -5,13 +5,20 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 
-#if UNITY_6000_0_OR_NEWER
-#pragma warning disable CS0618 // TreeViewItem is obsolete in Unity 6 — suppress until migrated to UI Toolkit
+#if UNITY_6000_2_OR_NEWER
+using TreeViewBase = UnityEditor.IMGUI.Controls.TreeView<int>;
+using TreeViewItemBase = UnityEditor.IMGUI.Controls.TreeViewItem<int>;
+using TreeViewStateBase = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+#else
+using TreeViewBase = UnityEditor.IMGUI.Controls.TreeView;
+using TreeViewItemBase = UnityEditor.IMGUI.Controls.TreeViewItem;
+using TreeViewStateBase = UnityEditor.IMGUI.Controls.TreeViewState;
+#pragma warning disable CS0618
 #endif
 
 namespace BrunoMikoski.ServicesLocation
 {
-    public class AvailableServiceViewItem : TreeViewItem
+    public class AvailableServiceViewItem : TreeViewItemBase
     {
         public ServiceImplementationAttribute ServiceAttribute { get; set; }
         public string GroupName = "";
@@ -59,14 +66,14 @@ namespace BrunoMikoski.ServicesLocation
         }
     }
     
-    public class AvailableServiceTreeView : TreeView
+    public class AvailableServiceTreeView : TreeViewBase
     {
         private const string SORTED_COLUMN_INDEX_STATE_KEY = "AvailableServiceTreeView_sortedColumnIndex";
 
-        public IReadOnlyList<TreeViewItem> CurrentBindingItems;
+        public IReadOnlyList<TreeViewItemBase> CurrentBindingItems;
 
         public AvailableServiceTreeView()
-            : this(new TreeViewState(), new MultiColumnHeader(new MultiColumnHeaderState(new[]
+            : this(new TreeViewStateBase(), new MultiColumnHeader(new MultiColumnHeaderState(new[]
             {
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Enabled"), width = 3},
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Group Name"), width = 5},
@@ -78,7 +85,7 @@ namespace BrunoMikoski.ServicesLocation
         {
         }
 
-        AvailableServiceTreeView(TreeViewState state, MultiColumnHeader header)
+        AvailableServiceTreeView(TreeViewStateBase state, MultiColumnHeader header)
             : base(state, header)
         {
             rowHeight = 20;
@@ -145,14 +152,14 @@ namespace BrunoMikoski.ServicesLocation
                     throw new ArgumentOutOfRangeException(nameof(index), index, null);
             }
 
-            CurrentBindingItems = rootItem.children = orderedEnumerable.Cast<TreeViewItem>().ToList();
+            CurrentBindingItems = rootItem.children = orderedEnumerable.Cast<TreeViewItemBase>().ToList();
             BuildRows(rootItem);
         }
 
-        protected override TreeViewItem BuildRoot()
+        protected override TreeViewItemBase BuildRoot()
         {
-            TreeViewItem root = new TreeViewItem { depth = -1 };
-            List<TreeViewItem> children = new List<TreeViewItem>();
+            TreeViewItemBase root = new TreeViewItemBase { depth = -1 };
+            List<TreeViewItemBase> children = new List<TreeViewItemBase>();
 
 
 
@@ -172,11 +179,11 @@ namespace BrunoMikoski.ServicesLocation
             }
 
             CurrentBindingItems = children;
-            root.children = CurrentBindingItems as List<TreeViewItem>;
+            root.children = CurrentBindingItems as List<TreeViewItemBase>;
             return root;
         }
 
-        protected override bool CanMultiSelect(TreeViewItem item)
+        protected override bool CanMultiSelect(TreeViewItemBase item)
         {
             return false;
         }
@@ -312,6 +319,6 @@ namespace BrunoMikoski.ServicesLocation
     }
 }
 
-#if UNITY_6000_0_OR_NEWER
+#if !UNITY_6000_2_OR_NEWER
 #pragma warning restore CS0618
 #endif
