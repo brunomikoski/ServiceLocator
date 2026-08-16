@@ -72,16 +72,16 @@ namespace BrunoMikoski.ServicesLocation
 
         private bool CanRegisterService(Type type, object serviceInstance)
         {
-            if (HasService(type))
-            {
-                Debug.LogError($"Service of type {type} is already registered.");
-                return false;
-            }
-
             if (serviceInstance is IConditionalService conditionalService)
             {
                 if (!conditionalService.CanBeRegistered(this))
                     return false;
+            }
+
+            if (HasService(type))
+            {
+                Debug.LogError($"Service of type {type} is already registered.");
+                return false;
             }
 
             return true;
