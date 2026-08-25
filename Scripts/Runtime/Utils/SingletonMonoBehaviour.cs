@@ -29,13 +29,7 @@ namespace BrunoMikoski.ServicesLocation
                     instance = FindObjectOfType<T>();
 #endif
                     if (instance == null)
-                    {
-                        GameObject obj = new GameObject
-                        {
-                            name = $"{typeof(T).Name} (Singleton)"
-                        };
-                        instance = obj.AddComponent<T>();
-                    }
+                        instance = CreateInstance();
 
                     hasInstance = instance != null;
                 }
@@ -43,6 +37,38 @@ namespace BrunoMikoski.ServicesLocation
                 return instance;
             }
         }
+
+        private static T CreateInstance()
+        {
+            string singletonName = $"{typeof(T).Name} (Singleton)";
+
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                GameObject editorHost = UnityEditor.EditorUtility.CreateGameObjectWithHideFlags(
+                    singletonName, HideFlags.HideAndDontSave);
+
+                UnityEditor.AssemblyReloadEvents.beforeAssemblyReload += DestroyEditorInstance;
+                return editorHost.AddComponent<T>();
+            }
+#endif
+
+            GameObject host = new GameObject(singletonName);
+            return host.AddComponent<T>();
+        }
+
+#if UNITY_EDITOR
+        private static void DestroyEditorInstance()
+        {
+            UnityEditor.AssemblyReloadEvents.beforeAssemblyReload -= DestroyEditorInstance;
+
+            if (instance != null)
+                DestroyImmediate(instance.gameObject);
+
+            instance = null;
+            hasInstance = false;
+        }
+#endif
 
         protected virtual void Awake()
         {
