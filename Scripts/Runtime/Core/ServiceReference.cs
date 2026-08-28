@@ -70,9 +70,6 @@ namespace BrunoMikoski.ServicesLocation
 
         private void SubscribeToServiceChanges()
         {
-            if (subscribedToServiceChanges)
-                return;
-
             subscribedToServiceChanges = true;
             ServiceLocator.Instance.SubscribeToServiceChanges<T>(this);
         }
