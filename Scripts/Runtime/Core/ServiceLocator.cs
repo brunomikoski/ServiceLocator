@@ -278,13 +278,17 @@ namespace BrunoMikoski.ServicesLocation
                 serviceTypeToObservables.Add(type, observables);
             }
 
+            bool alreadySubscribed = false;
             for (int i = observables.Count - 1; i >= 0; i--)
             {
                 if (!observables[i].TryGetTarget(out IServiceObservable existing))
                     observables.RemoveAt(i);
                 else if (ReferenceEquals(existing, observable))
-                    return;
+                    alreadySubscribed = true;
             }
+
+            if (alreadySubscribed)
+                return;
 
             observables.Add(new WeakReference<IServiceObservable>(observable));
         }
