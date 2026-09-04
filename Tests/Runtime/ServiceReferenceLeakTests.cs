@@ -38,6 +38,25 @@ namespace BrunoMikoski.ServicesLocation.Tests
                 "Dispose() should have unsubscribed the observer immediately.");
         }
 
+        [Test]
+        public void HasCachedReference_IsTrue_InsideUnregisteredCallback()
+        {
+            ServiceLocator.Instance.RegisterInstance(new DummyService());
+
+            ServiceReference<DummyService> reference = new();
+            _ = reference.Reference;
+
+            bool guardPassed = false;
+            reference.OnWhenServiceGetsUnregistered += () => guardPassed = reference.HasCachedReference;
+
+            ServiceLocator.Instance.UnregisterInstance<DummyService>();
+
+            Assert.IsTrue(guardPassed,
+                "HasCachedReference must still be true inside an OnWhenServiceGetsUnregistered handler, " +
+                "otherwise every `if (x.HasCachedReference) x.Reference.Evt -= H;` written there is dead " +
+                "code and the subscription leaks. ClearCache() must run after the invoke.");
+        }
+
         [UnityTest]
         public IEnumerator AbandonedReferences_AreCollected_NotLeaked()
         {

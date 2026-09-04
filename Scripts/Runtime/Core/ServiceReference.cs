@@ -206,8 +206,8 @@ namespace BrunoMikoski.ServicesLocation
             if (targetType != typeof(T))
                 return;
 
-            ClearCache();
             onWhenServiceGetsUnregistered?.Invoke();
+            ClearCache();
         }
 
 #if UNITASK_ENABLED
