@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Runtime.CompilerServices;
 using NUnit.Framework;
+using UnityEngine;
 using UnityEngine.TestTools;
 
 namespace BrunoMikoski.ServicesLocation.Tests
@@ -10,6 +11,10 @@ namespace BrunoMikoski.ServicesLocation.Tests
     {
         // Plain POCO service so registration doesn't depend on any Unity object lifecycle.
         private class DummyService
+        {
+        }
+
+        private class OwnerBehaviour : MonoBehaviour
         {
         }
 
@@ -93,6 +98,40 @@ namespace BrunoMikoski.ServicesLocation.Tests
                 ServiceReference<DummyService> reference = new();
                 _ = reference.Reference;
             }
+        }
+
+        [Test]
+        public void WhenServiceBecomesAvailable_HonoursOwner_AndNeverQueuesTwice()
+        {
+            GameObject go = new GameObject(nameof(WhenServiceBecomesAvailable_HonoursOwner_AndNeverQueuesTwice));
+            OwnerBehaviour owner = go.AddComponent<OwnerBehaviour>();
+            ServiceReference<DummyService> reference = new();
+            int calls = 0;
+            Action callback = () => calls++;
+
+            reference.WhenServiceBecomesAvailable(callback, owner);
+            reference.WhenServiceBecomesAvailable(callback, owner);
+            ServiceLocator.Instance.RegisterInstance(new DummyService());
+            Assert.AreEqual(1, calls, "The same callback was queued twice.");
+
+            reference.WhenServiceBecomesAvailable(callback, owner);
+            Assert.AreEqual(2, calls, "Immediate path did not run the callback.");
+            ServiceLocator.Instance.UnregisterInstance<DummyService>();
+            ServiceLocator.Instance.RegisterInstance(new DummyService());
+            Assert.AreEqual(2, calls, "Immediate path leaked a pending closure that re-fired on re-registration.");
+
+            ServiceLocator.Instance.UnregisterInstance<DummyService>();
+            reference.WhenServiceBecomesAvailable(callback, owner);
+            owner.enabled = false;
+            ServiceLocator.Instance.RegisterInstance(new DummyService());
+            Assert.AreEqual(2, calls, "Callback ran for a disabled owner.");
+
+            ServiceLocator.Instance.UnregisterInstance<DummyService>();
+            owner.enabled = true;
+            reference.WhenServiceBecomesAvailable(callback, owner);
+            UnityEngine.Object.DestroyImmediate(go);
+            ServiceLocator.Instance.RegisterInstance(new DummyService());
+            Assert.AreEqual(2, calls, "Callback ran for a destroyed owner.");
         }
     }
 }

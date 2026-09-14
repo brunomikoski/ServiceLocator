@@ -1,5 +1,7 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
 #if UNITASK_ENABLED
 using Cysharp.Threading.Tasks;
 #endif
@@ -22,6 +24,7 @@ namespace BrunoMikoski.ServicesLocation
         }
 
         private bool subscribedToServiceChanges;
+        private List<Action> pendingCallbacks;
 
         private Action onWhenServiceGetsRegistered;
         public event Action OnWhenServiceGetsRegistered
@@ -179,6 +182,7 @@ namespace BrunoMikoski.ServicesLocation
         {
             UnsubscribeFromServiceChanges();
             ClearCache();
+            pendingCallbacks?.Clear();
             onWhenServiceGetsRegistered = null;
             onWhenServiceGetsUnregistered = null;
         }
@@ -224,19 +228,41 @@ namespace BrunoMikoski.ServicesLocation
             }
         }
 
-        public void WhenServiceBecomesAvailable(Action callback)
+        public void WhenServiceBecomesAvailable(Action callback, Behaviour owner = null)
         {
             if (callback == null)
                 throw new ArgumentNullException(nameof(callback));
 
+            if (Exists)
+            {
+                if (CanInvoke(owner))
+                    callback.Invoke();
+                return;
+            }
+
+            pendingCallbacks ??= new List<Action>();
+            if (pendingCallbacks.Contains(callback))
+                return;
+
+            pendingCallbacks.Add(callback);
             OnWhenServiceGetsRegistered += ServiceAvailable;
             return;
 
             void ServiceAvailable()
             {
-                callback.Invoke();
                 OnWhenServiceGetsRegistered -= ServiceAvailable;
+                pendingCallbacks.Remove(callback);
+                if (CanInvoke(owner))
+                    callback.Invoke();
             }
+        }
+
+        private static bool CanInvoke(Behaviour owner)
+        {
+            if (ReferenceEquals(owner, null))
+                return true;
+
+            return owner != null && owner.isActiveAndEnabled;
         }
     }
 }
